@@ -126,3 +126,38 @@ export function stateInsert(userId: string, key: ReminderKey): ReminderStateInse
 export function stateUpdate(patch: ReminderStateUpdate): ReminderStateUpdate {
 	return patch;
 }
+
+export async function listDueReminders(supabase: Client, limit?: number): Promise<ReminderRow[]> {
+	let query = supabase
+		.from('tracked_item_reminders_v')
+		.select('*')
+		.eq('is_visible', true)
+		.order('event_date', { ascending: true, nullsFirst: false })
+		.order('lead_days', { ascending: true, nullsFirst: false })
+		.order('name', { ascending: true, nullsFirst: false });
+
+	if (limit !== undefined) {
+		query = query.limit(limit);
+	}
+
+	const { data, error } = await query;
+
+	if (error) {
+		throw error;
+	}
+
+	return (data ?? []).filter(isReminderRow);
+}
+
+export async function countUnreadReminders(supabase: Client): Promise<number> {
+	const { count, error } = await supabase
+		.from('tracked_item_reminders_v')
+		.select('tracked_item_id', { count: 'exact', head: true })
+		.eq('is_unread', true);
+
+	if (error) {
+		throw error;
+	}
+
+	return count ?? 0;
+}
