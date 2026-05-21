@@ -9,6 +9,9 @@
 	},
 	"scripts": {
 		"dev": "vite dev",
+		"dev:env": "node scripts/dev-env.mjs",
+		"dev:local": "node scripts/dev-env.mjs local",
+		"dev:remote": "node scripts/dev-env.mjs remote",
 		"build": "vite build",
 		"start": "node build/index.js",
 		"preview": "vite preview",

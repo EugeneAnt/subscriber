@@ -125,6 +125,17 @@ Run the app:
 npm run dev
 ```
 
+Choose a specific Supabase environment:
+
+```bash
+npm run dev:local
+npm run dev:remote
+npm run dev:env -- local
+npm run dev:env -- remote
+```
+
+`local` reads `.env`. `remote` reads `.env.production.local`, which is ignored by Git.
+
 Build and preview:
 
 ```bash
