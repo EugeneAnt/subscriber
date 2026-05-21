@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
+	import DueReminders from '$lib/components/DueReminders.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import Filters from '$lib/components/Filters.svelte';
 	import ItemCardList from '$lib/components/ItemCardList.svelte';
@@ -48,6 +49,8 @@
 			actionLabel="Add your first item"
 		/>
 	{:else}
+		<DueReminders reminders={data.reminders} totalCount={data.reminderCount} />
+
 		<UpcomingList events={data.events} />
 
 		<section class="space-y-3" aria-labelledby="items-heading">

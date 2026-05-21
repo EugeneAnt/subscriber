@@ -11,6 +11,7 @@ import {
 } from '$lib/server/dashboard';
 import { consumeFlash, setFlash } from '$lib/server/flash';
 import { safeRedirectPath } from '$lib/server/redirects';
+import { countUnreadReminders, listDueReminders } from '$lib/server/reminders';
 import {
 	deleteItem,
 	listBurn,
@@ -46,12 +47,15 @@ export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 		? listItemsForTable(locals.supabase, filters)
 		: null;
 
-	const [allItemRows, filteredItemRows, eventRows, burnRows] = await Promise.all([
-		listItemsForTable(locals.supabase, {}),
-		filteredItemsPromise,
-		listUpcomingEvents(locals.supabase, 90),
-		listBurn(locals.supabase)
-	]);
+	const [allItemRows, filteredItemRows, eventRows, burnRows, reminderRows, reminderCount] =
+		await Promise.all([
+			listItemsForTable(locals.supabase, {}),
+			filteredItemsPromise,
+			listUpcomingEvents(locals.supabase, 90),
+			listBurn(locals.supabase),
+			listDueReminders(locals.supabase, 3),
+			countUnreadReminders(locals.supabase)
+		]);
 
 	const allItems = toDashboardItems(allItemRows);
 	const items = toDashboardItems(filteredItemRows ?? allItemRows);
@@ -69,6 +73,8 @@ export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 		filters,
 		categories,
 		providers,
+		reminders: reminderRows,
+		reminderCount,
 		flash
 	};
 };
