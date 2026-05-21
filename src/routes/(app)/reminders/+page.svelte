@@ -1,7 +1,16 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { toast } from 'svelte-sonner';
+
 	import ReminderList from '$lib/components/ReminderList.svelte';
 
 	let { data } = $props();
+
+	onMount(() => {
+		if (data.flash?.type === 'success') {
+			toast.success(data.flash.message);
+		}
+	});
 </script>
 
 <svelte:head>

@@ -33,7 +33,7 @@
 		<input type="hidden" name="event_kind" value={reminder.event_kind} />
 		<input type="hidden" name="event_date" value={reminder.event_date} />
 		<input type="hidden" name="lead_days" value={reminder.lead_days} />
-		<Button variant="secondary" size={compact ? 'sm' : 'default'} class="min-h-11">
+		<Button type="submit" variant="secondary" size={compact ? 'sm' : 'default'} class="min-h-11">
 			<CheckIcon />
 			Mark read
 		</Button>
@@ -44,7 +44,7 @@
 		<input type="hidden" name="event_kind" value={reminder.event_kind} />
 		<input type="hidden" name="event_date" value={reminder.event_date} />
 		<input type="hidden" name="lead_days" value={reminder.lead_days} />
-		<Button variant="secondary" size={compact ? 'sm' : 'default'} class="min-h-11">
+		<Button type="submit" variant="secondary" size={compact ? 'sm' : 'default'} class="min-h-11">
 			<ClockIcon />
 			Snooze
 		</Button>
@@ -55,7 +55,7 @@
 		<input type="hidden" name="event_kind" value={reminder.event_kind} />
 		<input type="hidden" name="event_date" value={reminder.event_date} />
 		<input type="hidden" name="lead_days" value={reminder.lead_days} />
-		<Button variant="ghost" size={compact ? 'sm' : 'default'} class="min-h-11">
+		<Button type="submit" variant="ghost" size={compact ? 'sm' : 'default'} class="min-h-11">
 			<XIcon />
 			Dismiss
 		</Button>

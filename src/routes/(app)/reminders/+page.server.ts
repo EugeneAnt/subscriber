@@ -1,6 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 
-import { setFlash } from '$lib/server/flash';
+import { consumeFlash, setFlash } from '$lib/server/flash';
 import {
 	dismissReminder,
 	listDueReminders,
@@ -37,9 +37,10 @@ function isStaleReminderError(error: unknown): boolean {
 	return error instanceof Error && error.message === 'Reminder source no longer exists';
 }
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ cookies, locals }) => {
 	return {
-		reminders: await listDueReminders(locals.supabase)
+		reminders: await listDueReminders(locals.supabase),
+		flash: consumeFlash(cookies)
 	};
 };
 
