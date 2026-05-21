@@ -126,8 +126,7 @@ describe('reminder read helpers', () => {
 		await markReminderRead(supabase, userId, key);
 		await expect(countUnreadReminders(supabase)).resolves.toBe(2);
 		expect(
-			(await listDueReminders(supabase)).find((row) => row.tracked_item_id === itemId)
-				?.is_unread
+			(await listDueReminders(supabase)).find((row) => row.tracked_item_id === itemId)?.is_unread
 		).toBe(false);
 
 		await dismissReminder(supabase, userId, key);

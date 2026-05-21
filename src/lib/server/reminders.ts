@@ -7,8 +7,7 @@ type ReminderStateInsert = Database['public']['Tables']['reminder_states']['Inse
 type ReminderStateUpdate = Database['public']['Tables']['reminder_states']['Update'];
 type ReminderViewRow = Database['public']['Views']['tracked_item_reminders_v']['Row'];
 
-const uuidPattern =
-	/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/;
 const allowedLeadDays = new Set([1, 7]);
 

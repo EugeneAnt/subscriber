@@ -9,6 +9,7 @@ It uses Supabase for Auth, Postgres, PostgREST, and Row Level Security. The app 
 - Email and password sign-in with Supabase Auth
 - Unified tracked items for subscriptions, expiry-only items, and hybrid items
 - Dashboard summary tiles, upcoming events, filters, desktop table, and mobile card list
+- In-app payment reminders 7 days and 1 day before upcoming billing dates
 - Calendar-aware billing rollover in Postgres
 - Per-currency monthly and annualized burn views
 - Server-side validation with Valibot and sveltekit-superforms

@@ -24,6 +24,6 @@
 			<Button href="/reminders" variant="outline">View all</Button>
 		</div>
 
-		<ReminderList reminders={reminders} compact actionBase="/reminders" />
+		<ReminderList {reminders} compact actionBase="/reminders" />
 	</section>
 {/if}
