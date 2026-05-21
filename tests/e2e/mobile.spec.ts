@@ -1,4 +1,5 @@
 import { expect, signIn, test } from './helpers/auth';
+import { dateFromToday } from './helpers/dates';
 import { createE2EItem } from './helpers/supabase';
 
 test('dashboard uses mobile cards with 44px tap targets', async ({ page, testUser }, testInfo) => {
@@ -28,6 +29,27 @@ test('dashboard uses mobile cards with 44px tap targets', async ({ page, testUse
 
 	for (let index = 0; index < (await actionButtons.count()); index += 1) {
 		const box = await actionButtons.nth(index).boundingBox();
+		expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+		expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+	}
+});
+
+test('reminders page uses mobile-friendly action targets', async ({ page, testUser }, testInfo) => {
+	test.skip(testInfo.project.name !== 'webkit-mobile', 'Mobile-only coverage.');
+
+	await createE2EItem(testUser.id, {
+		name: 'Mobile Reminder Target',
+		billing_anchor_date: dateFromToday(7)
+	});
+
+	await signIn(page, testUser);
+	await page.goto('/reminders');
+
+	const actions = page.locator('form button');
+	await expect(actions.first()).toBeVisible();
+
+	for (let index = 0; index < (await actions.count()); index += 1) {
+		const box = await actions.nth(index).boundingBox();
 		expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
 		expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
 	}

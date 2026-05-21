@@ -1,12 +1,6 @@
 import { expect, signIn, test } from './helpers/auth';
+import { dateFromToday } from './helpers/dates';
 import { createE2EItem } from './helpers/supabase';
-
-function dateFromToday(days: number): string {
-	const date = new Date();
-	date.setUTCDate(date.getUTCDate() + days);
-
-	return date.toISOString().slice(0, 10);
-}
 
 test.beforeEach(async ({ page, testUser }) => {
 	await createE2EItem(testUser.id, {
