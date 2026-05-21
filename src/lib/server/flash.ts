@@ -5,7 +5,11 @@ const flashCookieName = 'subscriber_flash';
 const flashMessages = {
 	item_created: 'Item created',
 	item_saved: 'Item saved',
-	item_deleted: 'Item deleted'
+	item_deleted: 'Item deleted',
+	reminder_read: 'Reminder marked read',
+	reminder_snoozed: 'Reminder snoozed',
+	reminder_dismissed: 'Reminder dismissed',
+	reminder_stale: 'Reminder is no longer current'
 } as const;
 
 export type FlashKind = keyof typeof flashMessages;
