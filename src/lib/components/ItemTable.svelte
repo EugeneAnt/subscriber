@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { Badge, type BadgeVariant } from '$lib/components/ui/badge';
 	import type { DashboardItem } from '$lib/types/dashboard';
 
@@ -37,7 +38,10 @@
 			{#each rows as row (row.id)}
 				<tr class="border-b last:border-0">
 					<td class="max-w-52 px-3 py-3">
-						<a class="block truncate font-medium hover:underline" href={`/items/${row.id}`}>
+						<a
+							class="block truncate font-medium hover:underline"
+							href={resolve('/(app)/items/[id]', { id: row.id })}
+						>
 							{row.name}
 						</a>
 					</td>

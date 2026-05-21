@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { Badge, type BadgeVariant } from '$lib/components/ui/badge';
 	import type { DashboardItem } from '$lib/types/dashboard';
 
@@ -23,7 +24,7 @@
 	{#each rows as row (row.id)}
 		<li>
 			<a
-				href={`/items/${row.id}`}
+				href={resolve('/(app)/items/[id]', { id: row.id })}
 				class="block min-h-11 rounded-lg border bg-card p-4 text-card-foreground active:bg-muted"
 				style="touch-action: manipulation"
 			>

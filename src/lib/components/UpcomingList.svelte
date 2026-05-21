@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { Badge } from '$lib/components/ui/badge';
 	import type { DashboardEvent } from '$lib/types/dashboard';
 
@@ -40,7 +41,7 @@
 					<div class="min-w-0">
 						<a
 							class="block truncate font-medium hover:underline"
-							href={`/items/${event.tracked_item_id}`}
+							href={resolve('/(app)/items/[id]', { id: event.tracked_item_id })}
 						>
 							{event.name}
 						</a>

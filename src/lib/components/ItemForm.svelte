@@ -25,15 +25,15 @@
 		enhanced = true;
 	});
 
-	// svelte-ignore state_referenced_locally - Selects intentionally copy server defaults into local form state.
+	// svelte-ignore state_referenced_locally
 	let type = $state<TrackedItemInput['type']>(form.data.type ?? 'subscription');
-	// svelte-ignore state_referenced_locally - Selects intentionally copy server defaults into local form state.
+	// svelte-ignore state_referenced_locally
 	let billingCycle = $state<NonNullable<TrackedItemInput['billing_cycle']>>(
 		form.data.billing_cycle ?? 'monthly'
 	);
-	// svelte-ignore state_referenced_locally - Selects intentionally copy server defaults into local form state.
+	// svelte-ignore state_referenced_locally
 	let status = $state<TrackedItemInput['status']>(form.data.status ?? 'active');
-	// svelte-ignore state_referenced_locally - Selects intentionally copy server defaults into local form state.
+	// svelte-ignore state_referenced_locally
 	let currency = $state(form.data.currency ?? '');
 
 	const needsBilling = $derived(type === 'subscription' || type === 'hybrid');

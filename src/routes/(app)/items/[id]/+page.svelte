@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import ItemForm from '$lib/components/ItemForm.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { buttonVariants } from '$lib/components/ui/button';
@@ -12,7 +13,7 @@
 </svelte:head>
 
 <div class="mx-auto max-w-2xl space-y-4">
-	<a href="/" class="text-sm text-muted-foreground hover:underline">Back to dashboard</a>
+	<a href={resolve('/')} class="text-sm text-muted-foreground hover:underline">Back to dashboard</a>
 
 	<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 		<h1 class="text-2xl font-semibold">Edit {data.row.name}</h1>

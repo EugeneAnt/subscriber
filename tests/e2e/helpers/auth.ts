@@ -7,7 +7,7 @@ type Fixtures = {
 };
 
 export const test = base.extend<Fixtures>({
-	testUser: async ({}, use) => {
+	testUser: async (_, use) => {
 		const user = await createE2EUser();
 
 		try {
