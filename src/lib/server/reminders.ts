@@ -161,3 +161,66 @@ export async function countUnreadReminders(supabase: Client): Promise<number> {
 
 	return count ?? 0;
 }
+
+async function upsertReminderState(
+	supabase: Client,
+	userId: string,
+	key: ReminderKey,
+	patch: ReminderStateUpdate
+): Promise<void> {
+	const sourceExists = await assertReminderSourceExists(supabase, key);
+	if (!sourceExists) {
+		throw new Error('Reminder source no longer exists');
+	}
+
+	const { error } = await supabase.from('reminder_states').upsert(
+		{
+			...stateInsert(userId, key),
+			...stateUpdate(patch)
+		},
+		{ onConflict: 'user_id,tracked_item_id,event_kind,event_date,lead_days' }
+	);
+
+	if (error) {
+		throw error;
+	}
+}
+
+export async function markReminderRead(
+	supabase: Client,
+	userId: string,
+	key: ReminderKey
+): Promise<void> {
+	await upsertReminderState(supabase, userId, key, {
+		read_at: new Date().toISOString()
+	});
+}
+
+export async function dismissReminder(
+	supabase: Client,
+	userId: string,
+	key: ReminderKey
+): Promise<void> {
+	await upsertReminderState(supabase, userId, key, {
+		read_at: new Date().toISOString(),
+		dismissed_at: new Date().toISOString(),
+		snoozed_until: null
+	});
+}
+
+export async function snoozeReminder(
+	supabase: Client,
+	userId: string,
+	key: ReminderKey,
+	untilDate: string
+): Promise<void> {
+	if (!isValidIsoDate(untilDate)) {
+		throw new Error('Invalid snooze date');
+	}
+
+	await upsertReminderState(supabase, userId, key, {
+		read_at: new Date().toISOString(),
+		dismissed_at: null,
+		snoozed_until: untilDate
+	});
+}

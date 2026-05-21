@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 
-import { countUnreadReminders, listDueReminders } from '../../src/lib/server/reminders';
+import {
+	countUnreadReminders,
+	dismissReminder,
+	listDueReminders,
+	markReminderRead,
+	snoozeReminder
+} from '../../src/lib/server/reminders';
 import type { Database } from '../../src/lib/types/database';
 import { admin, createTestUser, deleteTestUser, signedInClient } from './helpers/supabase';
 
@@ -83,6 +89,106 @@ describe('reminder read helpers', () => {
 			}
 		]);
 
+		await expect(countUnreadReminders(supabase)).resolves.toBe(1);
+	});
+
+	test('marks a reminder read, dismisses it, and snoozes it by upserting state', async () => {
+		const itemId = crypto.randomUUID();
+		const eventDate = dateFromToday(7);
+		const tomorrowItemId = crypto.randomUUID();
+		const tomorrowEventDate = dateFromToday(1);
+		await insertTrackedItems([
+			{
+				id: itemId,
+				user_id: userId,
+				name: 'Mutable reminder',
+				type: 'subscription',
+				billing_cycle: 'monthly',
+				billing_anchor_date: eventDate
+			},
+			{
+				id: tomorrowItemId,
+				user_id: userId,
+				name: 'Snoozable reminder',
+				type: 'subscription',
+				billing_cycle: 'monthly',
+				billing_anchor_date: tomorrowEventDate
+			}
+		]);
+
+		const key = {
+			tracked_item_id: itemId,
+			event_kind: 'billing' as const,
+			event_date: eventDate,
+			lead_days: 7 as const
+		};
+
+		await markReminderRead(supabase, userId, key);
+		await expect(countUnreadReminders(supabase)).resolves.toBe(2);
+		expect(
+			(await listDueReminders(supabase)).find((row) => row.tracked_item_id === itemId)
+				?.is_unread
+		).toBe(false);
+
+		await dismissReminder(supabase, userId, key);
+		expect((await listDueReminders(supabase)).some((row) => row.tracked_item_id === itemId)).toBe(
+			false
+		);
+
+		const tomorrowKey = {
+			tracked_item_id: tomorrowItemId,
+			event_kind: 'billing' as const,
+			event_date: tomorrowEventDate,
+			lead_days: 1 as const
+		};
+
+		expect(
+			(await listDueReminders(supabase)).some(
+				(row) => row.tracked_item_id === tomorrowItemId && row.lead_days === 1
+			)
+		).toBe(true);
+		await snoozeReminder(supabase, userId, tomorrowKey, dateFromToday(1));
+		expect(
+			(await listDueReminders(supabase)).some(
+				(row) => row.tracked_item_id === tomorrowItemId && row.lead_days === 1
+			)
+		).toBe(false);
+		expect(
+			(await listDueReminders(supabase)).some(
+				(row) => row.tracked_item_id === tomorrowItemId && row.lead_days === 7
+			)
+		).toBe(true);
+	});
+
+	test('cross-user client cannot act on another user reminder', async () => {
+		const otherEmail = `reminders-other-${crypto.randomUUID()}@test.local`;
+		const otherUser = await createTestUser(otherEmail);
+		createdUserIds.push(otherUser.id);
+		const otherClient = await signedInClient(otherEmail);
+
+		const itemId = crypto.randomUUID();
+		const eventDate = dateFromToday(7);
+		await insertTrackedItems([
+			{
+				id: itemId,
+				user_id: userId,
+				name: 'Cross-user reminder',
+				type: 'subscription',
+				billing_cycle: 'monthly',
+				billing_anchor_date: eventDate
+			}
+		]);
+
+		const key = {
+			tracked_item_id: itemId,
+			event_kind: 'billing' as const,
+			event_date: eventDate,
+			lead_days: 7 as const
+		};
+
+		await expect(markReminderRead(otherClient, userId, key)).rejects.toThrow(
+			'Reminder source no longer exists'
+		);
 		await expect(countUnreadReminders(supabase)).resolves.toBe(1);
 	});
 });
