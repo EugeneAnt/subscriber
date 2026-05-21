@@ -38,12 +38,12 @@ Runtime environment variables:
 
 ```bash
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your-anon-or-publishable-key
+SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 ORIGIN=https://your-app.example.com
 BODY_SIZE_LIMIT=524288
 ```
 
-`SUPABASE_SERVICE_ROLE_KEY` is intentionally not used by the application runtime. Keep service-role or secret keys for local admin scripts and tests only.
+`SUPABASE_ANON_KEY` is still accepted as a legacy fallback for local or self-hosted Supabase setups. `SUPABASE_SERVICE_ROLE_KEY` is intentionally not used by the application runtime. Keep service-role or secret keys for local admin scripts and tests only.
 
 For local development, copy `.env.example`:
 
@@ -90,11 +90,11 @@ supabase start
 supabase db reset
 ```
 
-Copy the local API URL and anon key from `supabase status` into `.env`:
+Copy the local API URL and anon key from `supabase status` into `.env`. The local CLI still prints a legacy anon key; put that value under `SUPABASE_PUBLISHABLE_KEY`:
 
 ```bash
 SUPABASE_URL=http://127.0.0.1:54321
-SUPABASE_ANON_KEY=<local anon key>
+SUPABASE_PUBLISHABLE_KEY=<local anon key>
 ORIGIN=http://localhost:5173
 BODY_SIZE_LIMIT=524288
 ```
@@ -181,7 +181,7 @@ Run it:
 docker run --rm \
   -p 3000:3000 \
   -e SUPABASE_URL="https://your-project.supabase.co" \
-  -e SUPABASE_ANON_KEY="your-anon-or-publishable-key" \
+  -e SUPABASE_PUBLISHABLE_KEY="your-publishable-key" \
   -e ORIGIN="http://localhost:3000" \
   -e BODY_SIZE_LIMIT="524288" \
   subscriber
@@ -206,7 +206,7 @@ For any reverse proxy or hosted runtime:
 
 - route traffic to container port `3000`
 - set `ORIGIN` to the public app URL
-- set `SUPABASE_URL` and `SUPABASE_ANON_KEY`
+- set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`
 - never expose service-role keys to the app runtime
 
 ## License

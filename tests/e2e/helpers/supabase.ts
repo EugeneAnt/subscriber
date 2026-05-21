@@ -22,8 +22,20 @@ function requiredEnv(name: string): string {
 	return value;
 }
 
+function lowPrivilegeKey(): string {
+	const value = process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_ANON_KEY;
+
+	if (!value) {
+		throw new Error(
+			'SUPABASE_PUBLISHABLE_KEY required. Legacy SUPABASE_ANON_KEY is also accepted.'
+		);
+	}
+
+	return value;
+}
+
 const SUPABASE_URL = requiredEnv('SUPABASE_URL');
-const SUPABASE_ANON_KEY = requiredEnv('SUPABASE_ANON_KEY');
+const SUPABASE_PUBLISHABLE_KEY = lowPrivilegeKey();
 const SUPABASE_SERVICE_ROLE_KEY = requiredEnv('SUPABASE_SERVICE_ROLE_KEY');
 
 export const admin = createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
@@ -34,7 +46,7 @@ export const admin = createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_
 	}
 });
 
-export const anon = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+export const anon = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
 	auth: {
 		autoRefreshToken: false,
 		detectSessionInUrl: false,

@@ -43,8 +43,11 @@ if (!env.SUPABASE_URL) {
 	process.exit(1);
 }
 
-if (!env.SUPABASE_ANON_KEY) {
-	console.error(`${config.file} is missing SUPABASE_ANON_KEY.`);
+env.SUPABASE_PUBLISHABLE_KEY ??= env.SUPABASE_ANON_KEY;
+
+if (!env.SUPABASE_PUBLISHABLE_KEY) {
+	console.error(`${config.file} is missing SUPABASE_PUBLISHABLE_KEY.`);
+	console.error('Legacy SUPABASE_ANON_KEY is also accepted for local/self-hosted setups.');
 	process.exit(1);
 }
 

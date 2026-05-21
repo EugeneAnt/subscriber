@@ -14,8 +14,20 @@ function requiredEnv(name: string): string {
 	return value;
 }
 
+function lowPrivilegeKey(): string {
+	const value = process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_ANON_KEY;
+
+	if (!value) {
+		throw new Error(
+			'SUPABASE_PUBLISHABLE_KEY required. Legacy SUPABASE_ANON_KEY is also accepted.'
+		);
+	}
+
+	return value;
+}
+
 const SUPABASE_URL = requiredEnv('SUPABASE_URL');
-const SUPABASE_ANON_KEY = requiredEnv('SUPABASE_ANON_KEY');
+const SUPABASE_PUBLISHABLE_KEY = lowPrivilegeKey();
 const SUPABASE_SERVICE_ROLE_KEY = requiredEnv('SUPABASE_SERVICE_ROLE_KEY');
 const TEST_PASSWORD = 'TestPassword123!';
 
@@ -27,8 +39,8 @@ export const admin = createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_
 	}
 });
 
-// Keep sign-in on the anon key path so helper clients behave like real users.
-const authClient = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+// Keep sign-in on the low-privilege key path so helper clients behave like real users.
+const authClient = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
 	auth: {
 		autoRefreshToken: false,
 		detectSessionInUrl: false,
@@ -37,7 +49,7 @@ const authClient = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 
 export function userClient(jwt: string): DatabaseClient {
-	return createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+	return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
 		// Supabase-js uses this bearer token for PostgREST calls while auth state stays disabled.
 		global: {
 			headers: {

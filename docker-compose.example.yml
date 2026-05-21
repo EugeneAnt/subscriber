@@ -8,6 +8,6 @@ services:
       HOST: 0.0.0.0
       PORT: 3000
       SUPABASE_URL: https://your-project.supabase.co
-      SUPABASE_ANON_KEY: replace-with-anon-or-publishable-key
+      SUPABASE_PUBLISHABLE_KEY: replace-with-publishable-key
       ORIGIN: http://localhost:3000
       BODY_SIZE_LIMIT: 524288
