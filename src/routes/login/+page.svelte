@@ -41,6 +41,6 @@
 			<p class="text-sm text-red-600" role="alert">{form.error}</p>
 		{/if}
 
-		<Button type="submit" class="w-full">Sign in</Button>
+		<Button type="submit" class="min-h-11 w-full">Sign in</Button>
 	</form>
 </main>
