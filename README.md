@@ -19,6 +19,7 @@ It uses Supabase for Auth, Postgres, PostgREST, and Row Level Security. The app 
 - Node.js 22 or newer
 - npm
 - A standard Supabase-compatible project
+- just, optional, for shorter local recipes
 - Docker, if using the Docker image or local Supabase CLI stack
 - Supabase CLI, if applying the included migrations yourself
 
@@ -119,11 +120,23 @@ Install dependencies:
 npm ci
 ```
 
+Optional `just` recipes are available for the common development commands:
+
+```bash
+just local   # app + local Supabase settings from .env
+just remote  # app + remote Supabase settings from .env.production.local
+just up      # start local Supabase
+just reset   # reset local Supabase database
+just test
+```
+
 Run the app:
 
 ```bash
 npm run dev
 ```
+
+`npm run dev` uses the local Supabase settings from `.env`.
 
 Choose a specific Supabase environment:
 

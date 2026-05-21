@@ -8,7 +8,7 @@
 		"node": ">=22.0.0 <25.0.0"
 	},
 	"scripts": {
-		"dev": "vite dev",
+		"dev": "node scripts/dev-env.mjs local",
 		"dev:env": "node scripts/dev-env.mjs",
 		"dev:local": "node scripts/dev-env.mjs local",
 		"dev:remote": "node scripts/dev-env.mjs remote",
