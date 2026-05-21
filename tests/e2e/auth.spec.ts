@@ -43,3 +43,18 @@ test('signs out and redirects protected routes back to login', async ({ page, te
 	await page.goto('/');
 	await expect(page).toHaveURL(/\/login/);
 });
+
+test('browser back after sign-out does not restore the protected dashboard', async ({
+	page,
+	testUser
+}) => {
+	await signIn(page, testUser);
+	await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+
+	await page.getByRole('button', { name: /Sign out/ }).click();
+	await expect(page).toHaveURL(/\/login/);
+
+	await page.goBack();
+	await expect(page).toHaveURL(/\/login/);
+	await expect(page.getByRole('heading', { name: 'Dashboard' })).toHaveCount(0);
+});

@@ -1,7 +1,19 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { onMount } from 'svelte';
 
 	let { children, data } = $props();
+
+	onMount(() => {
+		const reloadRestoredPage = (event: PageTransitionEvent) => {
+			if (event.persisted) {
+				window.location.reload();
+			}
+		};
+
+		window.addEventListener('pageshow', reloadRestoredPage);
+		return () => window.removeEventListener('pageshow', reloadRestoredPage);
+	});
 </script>
 
 <header class="border-b">

@@ -1,7 +1,11 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types';
 
-export const load: LayoutServerLoad = async ({ locals, url }) => {
+export const load: LayoutServerLoad = async ({ locals, setHeaders, url }) => {
+	setHeaders({
+		'cache-control': 'private, no-store, max-age=0'
+	});
+
 	let user;
 	try {
 		({ user } = await locals.safeGetSession());

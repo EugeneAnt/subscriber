@@ -7,7 +7,9 @@ type Fixtures = {
 };
 
 export const test = base.extend<Fixtures>({
-	testUser: async (_, use) => {
+	// Playwright fixture callbacks must destructure dependencies, even when none are needed.
+	// eslint-disable-next-line no-empty-pattern
+	testUser: async ({}, use) => {
 		const user = await createE2EUser();
 
 		try {

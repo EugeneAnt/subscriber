@@ -7,7 +7,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.supabase = createServerClient(env.SUPABASE_URL, env.SUPABASE_PUBLISHABLE_KEY, {
 		cookies: {
 			getAll: () => event.cookies.getAll(),
-			setAll: (cookies) => {
+			setAll: (cookies, responseHeaders) => {
 				for (const { name, value, options } of cookies) {
 					event.cookies.set(name, value, {
 						...options,
@@ -16,6 +16,18 @@ export const handle: Handle = async ({ event, resolve }) => {
 						sameSite: 'lax',
 						secure: event.url.protocol === 'https:'
 					});
+				}
+
+				if (responseHeaders) {
+					for (const [name, value] of Object.entries(responseHeaders)) {
+						try {
+							event.setHeaders({ [name]: value });
+						} catch (error) {
+							if (!(error instanceof Error) || !error.message.includes('header is already set')) {
+								throw error;
+							}
+						}
+					}
 				}
 			}
 		}
