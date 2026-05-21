@@ -40,6 +40,63 @@ export type Database = {
 				};
 				Relationships: [];
 			};
+			reminder_states: {
+				Row: {
+					created_at: string;
+					dismissed_at: string | null;
+					event_date: string;
+					event_kind: string;
+					id: string;
+					lead_days: number;
+					read_at: string | null;
+					snoozed_until: string | null;
+					tracked_item_id: string;
+					updated_at: string;
+					user_id: string;
+				};
+				Insert: {
+					created_at?: string;
+					dismissed_at?: string | null;
+					event_date: string;
+					event_kind: string;
+					id?: string;
+					lead_days: number;
+					read_at?: string | null;
+					snoozed_until?: string | null;
+					tracked_item_id: string;
+					updated_at?: string;
+					user_id: string;
+				};
+				Update: {
+					created_at?: string;
+					dismissed_at?: string | null;
+					event_date?: string;
+					event_kind?: string;
+					id?: string;
+					lead_days?: number;
+					read_at?: string | null;
+					snoozed_until?: string | null;
+					tracked_item_id?: string;
+					updated_at?: string;
+					user_id?: string;
+				};
+				Relationships: [
+					{
+						foreignKeyName: 'reminder_states_tracked_item_id_fkey';
+						columns: ['tracked_item_id'];
+						isOneToOne: false;
+						referencedRelation: 'tracked_items';
+						referencedColumns: ['id'];
+					},
+					{
+						foreignKeyName: 'reminder_states_tracked_item_id_fkey';
+						columns: ['tracked_item_id'];
+						isOneToOne: false;
+						referencedRelation: 'tracked_items_v';
+						referencedColumns: ['id'];
+					}
+				];
+			};
 			tracked_items: {
 				Row: {
 					amount: number | null;
@@ -117,6 +174,30 @@ export type Database = {
 					event_kind: string | null;
 					name: string | null;
 					provider: string | null;
+					tracked_item_id: string | null;
+					type: Database['public']['Enums']['tracked_item_type'] | null;
+					user_id: string | null;
+				};
+				Relationships: [];
+			};
+			tracked_item_reminders_v: {
+				Row: {
+					amount: number | null;
+					category: string | null;
+					currency: string | null;
+					dismissed_at: string | null;
+					effective_status: string | null;
+					event_date: string | null;
+					event_kind: string | null;
+					is_unread: boolean | null;
+					is_visible: boolean | null;
+					lead_days: number | null;
+					name: string | null;
+					provider: string | null;
+					read_at: string | null;
+					reminder_due_date: string | null;
+					snoozed_until: string | null;
+					state_id: string | null;
 					tracked_item_id: string | null;
 					type: Database['public']['Enums']['tracked_item_type'] | null;
 					user_id: string | null;
