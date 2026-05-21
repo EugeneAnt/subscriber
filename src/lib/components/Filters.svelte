@@ -1,4 +1,5 @@
 <script lang="ts">
+	import FormSelect, { type FormSelectOption } from '$lib/components/FormSelect.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import type { DashboardFilters } from '$lib/types/dashboard';
 
@@ -9,6 +10,28 @@
 	};
 
 	let { filters, categories, providers }: Props = $props();
+
+	const typeOptions: FormSelectOption[] = [
+		{ value: '', label: 'All types' },
+		{ value: 'subscription', label: 'Subscription' },
+		{ value: 'expiry', label: 'Expiry' },
+		{ value: 'hybrid', label: 'Hybrid' }
+	];
+	const statusOptions: FormSelectOption[] = [
+		{ value: '', label: 'All statuses' },
+		{ value: 'active', label: 'Active' },
+		{ value: 'paused', label: 'Paused' },
+		{ value: 'cancelled', label: 'Cancelled' },
+		{ value: 'expired', label: 'Expired' }
+	];
+	const categoryOptions = $derived<FormSelectOption[]>([
+		{ value: '', label: 'All categories' },
+		...categories.map((category) => ({ value: category, label: category }))
+	]);
+	const providerOptions = $derived<FormSelectOption[]>([
+		{ value: '', label: 'All providers' },
+		...providers.map((provider) => ({ value: provider, label: provider }))
+	]);
 </script>
 
 <form
@@ -16,54 +39,33 @@
 	class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]"
 	data-sveltekit-keepfocus
 >
-	<select
+	<FormSelect
 		name="type"
 		value={filters.type ?? ''}
-		class="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-11 rounded-lg border px-3 text-base outline-none focus-visible:ring-3"
-		aria-label="Filter by type"
-	>
-		<option value="">All types</option>
-		<option value="subscription">Subscription</option>
-		<option value="expiry">Expiry</option>
-		<option value="hybrid">Hybrid</option>
-	</select>
+		options={typeOptions}
+		ariaLabel="Filter by type"
+	/>
 
-	<select
+	<FormSelect
 		name="status"
 		value={filters.status ?? ''}
-		class="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-11 rounded-lg border px-3 text-base outline-none focus-visible:ring-3"
-		aria-label="Filter by status"
-	>
-		<option value="">All statuses</option>
-		<option value="active">Active</option>
-		<option value="paused">Paused</option>
-		<option value="cancelled">Cancelled</option>
-		<option value="expired">Expired</option>
-	</select>
+		options={statusOptions}
+		ariaLabel="Filter by status"
+	/>
 
-	<select
+	<FormSelect
 		name="category"
 		value={filters.category ?? ''}
-		class="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-11 rounded-lg border px-3 text-base outline-none focus-visible:ring-3"
-		aria-label="Filter by category"
-	>
-		<option value="">All categories</option>
-		{#each categories as category (category)}
-			<option value={category}>{category}</option>
-		{/each}
-	</select>
+		options={categoryOptions}
+		ariaLabel="Filter by category"
+	/>
 
-	<select
+	<FormSelect
 		name="provider"
 		value={filters.provider ?? ''}
-		class="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-11 rounded-lg border px-3 text-base outline-none focus-visible:ring-3"
-		aria-label="Filter by provider"
-	>
-		<option value="">All providers</option>
-		{#each providers as provider (provider)}
-			<option value={provider}>{provider}</option>
-		{/each}
-	</select>
+		options={providerOptions}
+		ariaLabel="Filter by provider"
+	/>
 
 	<div class="flex gap-2">
 		<Button type="submit" class="min-h-11 flex-1 lg:flex-none">Apply</Button>

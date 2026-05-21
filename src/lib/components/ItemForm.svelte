@@ -2,6 +2,8 @@
 	import { onMount } from 'svelte';
 	import type { SuperValidated } from 'sveltekit-superforms';
 
+	import DatePicker from '$lib/components/DatePicker.svelte';
+	import FormSelect, { type FormSelectOption } from '$lib/components/FormSelect.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
@@ -36,6 +38,28 @@
 	// svelte-ignore state_referenced_locally
 	let currency = $state(form.data.currency ?? '');
 
+	const typeOptions: FormSelectOption[] = [
+		{ value: 'subscription', label: 'Subscription' },
+		{ value: 'expiry', label: 'Expiry only' },
+		{ value: 'hybrid', label: 'Hybrid' }
+	];
+	const statusOptions: FormSelectOption[] = [
+		{ value: 'active', label: 'Active' },
+		{ value: 'paused', label: 'Paused' },
+		{ value: 'cancelled', label: 'Cancelled' }
+	];
+	const billingCycleOptions: FormSelectOption[] = [
+		{ value: 'weekly', label: 'Weekly' },
+		{ value: 'monthly', label: 'Monthly' },
+		{ value: 'quarterly', label: 'Quarterly' },
+		{ value: 'yearly', label: 'Yearly' },
+		{ value: 'custom_days', label: 'Every N days' }
+	];
+	const currencyOptions = $derived<FormSelectOption[]>([
+		{ value: '', label: 'None' },
+		...currencies.map((code) => ({ value: code, label: code }))
+	]);
+
 	const needsBilling = $derived(type === 'subscription' || type === 'hybrid');
 	const needsExpiry = $derived(type === 'expiry' || type === 'hybrid');
 	const needsCustomDays = $derived(billingCycle === 'custom_days');
@@ -43,10 +67,6 @@
 	function fieldError(name: keyof TrackedItemInput): string | undefined {
 		const errors = form.errors[name];
 		return Array.isArray(errors) ? errors[0] : undefined;
-	}
-
-	function selectedValue<T extends string>(event: Event): T {
-		return (event.currentTarget as HTMLSelectElement).value as T;
 	}
 </script>
 
@@ -74,17 +94,13 @@
 	<div class="grid gap-4 sm:grid-cols-2">
 		<div class="space-y-2">
 			<Label for="type">Type</Label>
-			<select
+			<FormSelect
 				id="type"
 				name="type"
-				value={type}
-				oninput={(event) => (type = selectedValue<TrackedItemInput['type']>(event))}
-				class="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-11 w-full rounded-lg border px-3 text-base outline-none focus-visible:ring-3"
-			>
-				<option value="subscription">Subscription</option>
-				<option value="expiry">Expiry only</option>
-				<option value="hybrid">Hybrid</option>
-			</select>
+				bind:value={type}
+				options={typeOptions}
+				invalid={Boolean(fieldError('type'))}
+			/>
 			{#if fieldError('type')}
 				<p class="text-sm text-destructive" role="alert">{fieldError('type')}</p>
 			{/if}
@@ -92,16 +108,13 @@
 
 		<div class="space-y-2">
 			<Label for="status">Status</Label>
-			<select
+			<FormSelect
 				id="status"
 				name="status"
 				bind:value={status}
-				class="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-11 w-full rounded-lg border px-3 text-base outline-none focus-visible:ring-3"
-			>
-				<option value="active">Active</option>
-				<option value="paused">Paused</option>
-				<option value="cancelled">Cancelled</option>
-			</select>
+				options={statusOptions}
+				invalid={Boolean(fieldError('status'))}
+			/>
 			{#if fieldError('status')}
 				<p class="text-sm text-destructive" role="alert">{fieldError('status')}</p>
 			{/if}
@@ -113,18 +126,13 @@
 			<div class="grid gap-4 sm:grid-cols-2">
 				<div class="space-y-2">
 					<Label for="billing_cycle">Billing cycle</Label>
-					<select
+					<FormSelect
 						id="billing_cycle"
 						name="billing_cycle"
 						bind:value={billingCycle}
-						class="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-11 w-full rounded-lg border px-3 text-base outline-none focus-visible:ring-3"
-					>
-						<option value="weekly">Weekly</option>
-						<option value="monthly">Monthly</option>
-						<option value="quarterly">Quarterly</option>
-						<option value="yearly">Yearly</option>
-						<option value="custom_days">Every N days</option>
-					</select>
+						options={billingCycleOptions}
+						invalid={Boolean(fieldError('billing_cycle'))}
+					/>
 					{#if fieldError('billing_cycle')}
 						<p class="text-sm text-destructive" role="alert">{fieldError('billing_cycle')}</p>
 					{/if}
@@ -132,15 +140,13 @@
 
 				<div class="space-y-2">
 					<Label for="billing_anchor_date">Billing anchor date</Label>
-					<Input
+					<DatePicker
 						id="billing_anchor_date"
 						name="billing_anchor_date"
-						type="date"
 						min="1900-01-01"
 						max="2100-12-31"
-						required
 						value={form.data.billing_anchor_date ?? ''}
-						aria-invalid={fieldError('billing_anchor_date') ? 'true' : undefined}
+						invalid={Boolean(fieldError('billing_anchor_date'))}
 					/>
 					{#if fieldError('billing_anchor_date')}
 						<p class="text-sm text-destructive" role="alert">{fieldError('billing_anchor_date')}</p>
@@ -174,15 +180,13 @@
 		{#if needsExpiry}
 			<div class="space-y-2">
 				<Label for="expiry_date">Expiry date</Label>
-				<Input
+				<DatePicker
 					id="expiry_date"
 					name="expiry_date"
-					type="date"
 					min="1900-01-01"
 					max="2100-12-31"
-					required
 					value={form.data.expiry_date ?? ''}
-					aria-invalid={fieldError('expiry_date') ? 'true' : undefined}
+					invalid={Boolean(fieldError('expiry_date'))}
 				/>
 				{#if fieldError('expiry_date')}
 					<p class="text-sm text-destructive" role="alert">{fieldError('expiry_date')}</p>
@@ -211,18 +215,13 @@
 
 		<div class="space-y-2">
 			<Label for="currency">Currency</Label>
-			<select
+			<FormSelect
 				id="currency"
 				name="currency"
 				bind:value={currency}
-				class="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-11 w-full rounded-lg border px-3 text-base outline-none focus-visible:ring-3"
-				aria-invalid={fieldError('currency') ? 'true' : undefined}
-			>
-				<option value="">None</option>
-				{#each currencies as code (code)}
-					<option value={code}>{code}</option>
-				{/each}
-			</select>
+				options={currencyOptions}
+				invalid={Boolean(fieldError('currency'))}
+			/>
 			{#if fieldError('currency')}
 				<p class="text-sm text-destructive" role="alert">{fieldError('currency')}</p>
 			{/if}
