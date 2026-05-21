@@ -1,4 +1,6 @@
 import { error, redirect } from '@sveltejs/kit';
+
+import { countUnreadReminders } from '$lib/server/reminders';
 import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = async ({ locals, setHeaders, url }) => {
@@ -17,7 +19,11 @@ export const load: LayoutServerLoad = async ({ locals, setHeaders, url }) => {
 		const next = url.pathname + url.search;
 		throw redirect(303, `/login?next=${encodeURIComponent(next)}`);
 	}
+
+	const reminderCount = await countUnreadReminders(locals.supabase);
+
 	return {
-		user: { id: user.id, email: user.email ?? null }
+		user: { id: user.id, email: user.email ?? null },
+		reminderCount
 	};
 };

@@ -1,12 +1,23 @@
 import { describe, expect, test } from 'vitest';
 import { load } from './+layout.server';
 
+function unreadReminderCountClient(count: number) {
+	return {
+		from: () => ({
+			select: () => ({
+				eq: async () => ({ count, error: null })
+			})
+		})
+	};
+}
+
 describe('(app) layout server load', () => {
 	test('marks protected pages as non-cacheable', async () => {
 		const headers: Record<string, string> = {};
 
 		await load({
 			locals: {
+				supabase: unreadReminderCountClient(0),
 				safeGetSession: async () => ({
 					session: null,
 					user: { id: 'user-id', email: 'user@example.com' }
