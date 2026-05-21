@@ -19,6 +19,7 @@
 		min?: string;
 		max?: string;
 		invalid?: boolean;
+		ariaDescribedBy?: string;
 		placeholder?: string;
 		class?: string;
 	};
@@ -26,10 +27,11 @@
 	let {
 		id,
 		name,
-		value = null,
+		value = $bindable(null),
 		min = '1900-01-01',
 		max = '2100-12-31',
 		invalid = false,
+		ariaDescribedBy,
 		placeholder = 'Select date',
 		class: className
 	}: Props = $props();
@@ -38,8 +40,8 @@
 
 	let open = $state(false);
 	// The form owns the initial value; after mount, the picker owns in-progress edits.
-	// svelte-ignore state_referenced_locally
 	let selected = $state<DateValue | undefined>(parseIsoDate(value));
+	let syncedValue = $state(value ?? null);
 
 	const minValue = $derived(parseIsoDate(min));
 	const maxValue = $derived(parseIsoDate(max));
@@ -57,6 +59,27 @@
 			return undefined;
 		}
 	}
+
+	function commitSelected(next: DateValue | undefined): void {
+		const nextValue = next?.toString() ?? null;
+		syncedValue = nextValue;
+		value = nextValue;
+	}
+
+	function commitInputValue(event: Event): void {
+		const nextValue = (event.currentTarget as HTMLInputElement).value || null;
+		selected = parseIsoDate(nextValue);
+		syncedValue = nextValue;
+		value = nextValue;
+	}
+
+	$effect(() => {
+		const nextValue = value ?? null;
+		if (nextValue !== syncedValue) {
+			selected = parseIsoDate(nextValue);
+			syncedValue = nextValue;
+		}
+	});
 </script>
 
 <Popover.Root bind:open>
@@ -66,6 +89,7 @@
 				{...props}
 				type="button"
 				variant="outline"
+				aria-describedby={ariaDescribedBy}
 				aria-invalid={invalid ? 'true' : undefined}
 				class={cn(
 					'h-11 w-full justify-start text-start text-base font-normal',
@@ -85,11 +109,18 @@
 			{minValue}
 			{maxValue}
 			captionLayout="dropdown"
-			onValueChange={() => {
+			onValueChange={(next) => {
+				commitSelected(next);
 				open = false;
 			}}
 		/>
 	</Popover.Content>
 </Popover.Root>
 
-<input type="hidden" {name} value={isoValue} />
+<input
+	type="hidden"
+	{name}
+	value={isoValue}
+	oninput={commitInputValue}
+	onchange={commitInputValue}
+/>

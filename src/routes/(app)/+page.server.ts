@@ -1,3 +1,4 @@
+import { error, redirect } from '@sveltejs/kit';
 import {
 	getDashboardSummary,
 	getDistinctOptions,
@@ -8,11 +9,39 @@ import {
 	toDashboardItems,
 	todayIso
 } from '$lib/server/dashboard';
-import { listBurn, listItemsForTable, listUpcomingEvents } from '$lib/server/tracked-items';
-import type { PageServerLoad } from './$types';
+import { consumeFlash, setFlash } from '$lib/server/flash';
+import { safeRedirectPath } from '$lib/server/redirects';
+import {
+	deleteItem,
+	listBurn,
+	listItemsForTable,
+	listUpcomingEvents
+} from '$lib/server/tracked-items';
+import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals, url }) => {
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function safeReferrerPath(request: Request, currentUrl: URL): string {
+	const referrer = request.headers.get('referer');
+	if (!referrer) {
+		return '/';
+	}
+
+	try {
+		const target = new URL(referrer);
+		if (target.origin !== currentUrl.origin) {
+			return '/';
+		}
+
+		return safeRedirectPath(`${target.pathname}${target.search}${target.hash}`);
+	} catch {
+		return '/';
+	}
+}
+
+export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	const filters = parseDashboardFilters(url.searchParams);
+	const flash = consumeFlash(cookies);
 	const filteredItemsPromise = hasDashboardFilters(filters)
 		? listItemsForTable(locals.supabase, filters)
 		: null;
@@ -39,6 +68,22 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		upcoming30Count,
 		filters,
 		categories,
-		providers
+		providers,
+		flash
 	};
+};
+
+export const actions: Actions = {
+	delete: async ({ locals, request, url, cookies }) => {
+		const formData = await request.formData();
+		const id = String(formData.get('id') ?? '');
+
+		if (!uuidPattern.test(id)) {
+			error(404, 'Not found');
+		}
+
+		await deleteItem(locals.supabase, id);
+		setFlash(cookies, 'item_deleted', url.protocol === 'https:');
+		throw redirect(303, safeReferrerPath(request, url));
+	}
 };

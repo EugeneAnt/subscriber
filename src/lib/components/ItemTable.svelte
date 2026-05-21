@@ -3,6 +3,8 @@
 	import { Badge, type BadgeVariant } from '$lib/components/ui/badge';
 	import type { DashboardItem } from '$lib/types/dashboard';
 
+	import ItemActions from './ItemActions.svelte';
+
 	type Props = {
 		rows: DashboardItem[];
 	};
@@ -32,6 +34,9 @@
 				<th class="px-3 py-3 font-medium">Next bill</th>
 				<th class="px-3 py-3 font-medium">Expires</th>
 				<th class="px-3 py-3 text-right font-medium">Amount</th>
+				<th class="px-3 py-3 text-right font-medium">
+					<span class="sr-only">Actions</span>
+				</th>
 			</tr>
 		</thead>
 		<tbody>
@@ -55,6 +60,9 @@
 					<td class="px-3 py-3 tabular-nums">{row.expiry_date ?? ''}</td>
 					<td class="px-3 py-3 text-right tabular-nums">{formatAmount(row.amount, row.currency)}</td
 					>
+					<td class="px-2 py-2 text-right">
+						<ItemActions id={row.id} name={row.name} />
+					</td>
 				</tr>
 			{/each}
 		</tbody>

@@ -1,14 +1,21 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import type { SuperValidated } from 'sveltekit-superforms';
+	import {
+		intProxy,
+		numberProxy,
+		stringProxy,
+		superForm,
+		type SuperValidated
+	} from 'sveltekit-superforms';
+	import { valibotClient } from 'sveltekit-superforms/adapters';
 
 	import DatePicker from '$lib/components/DatePicker.svelte';
 	import FormSelect, { type FormSelectOption } from '$lib/components/FormSelect.svelte';
 	import { Button } from '$lib/components/ui/button';
+	import * as Form from '$lib/components/ui/form';
 	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
 	import { Textarea } from '$lib/components/ui/textarea';
-	import type { TrackedItemInput } from '$lib/schemas/tracked-item';
+	import { trackedItemSchema, type TrackedItemInput } from '$lib/schemas/tracked-item';
 
 	type FormShape = SuperValidated<TrackedItemInput>;
 
@@ -20,23 +27,36 @@
 		hiddenUpdatedAt?: string | null;
 	};
 
-	let { form, action, submitLabel = 'Save', currencies, hiddenUpdatedAt = null }: Props = $props();
+	let {
+		form: initialForm,
+		action,
+		submitLabel = 'Save',
+		currencies,
+		hiddenUpdatedAt = null
+	}: Props = $props();
 	let enhanced = $state(false);
 
 	onMount(() => {
 		enhanced = true;
 	});
 
+	// The Superforms client instance is intentionally created once for this form component.
 	// svelte-ignore state_referenced_locally
-	let type = $state<TrackedItemInput['type']>(form.data.type ?? 'subscription');
-	// svelte-ignore state_referenced_locally
-	let billingCycle = $state<NonNullable<TrackedItemInput['billing_cycle']>>(
-		form.data.billing_cycle ?? 'monthly'
-	);
-	// svelte-ignore state_referenced_locally
-	let status = $state<TrackedItemInput['status']>(form.data.status ?? 'active');
-	// svelte-ignore state_referenced_locally
-	let currency = $state(form.data.currency ?? '');
+	const itemForm = superForm(initialForm, {
+		validators: valibotClient(trackedItemSchema),
+		resetForm: false
+	});
+	const { form: formData, errors, enhance, submitting } = itemForm;
+
+	const billingCycle = stringProxy(itemForm, 'billing_cycle', { empty: 'null' });
+	const customCycleDays = intProxy(itemForm, 'custom_cycle_days', { empty: 'null' });
+	const billingAnchorDate = stringProxy(itemForm, 'billing_anchor_date', { empty: 'null' });
+	const amount = numberProxy(itemForm, 'amount', { empty: 'null' });
+	const currency = stringProxy(itemForm, 'currency', { empty: 'null' });
+	const expiryDate = stringProxy(itemForm, 'expiry_date', { empty: 'null' });
+	const category = stringProxy(itemForm, 'category', { empty: 'null' });
+	const provider = stringProxy(itemForm, 'provider', { empty: 'null' });
+	const notes = stringProxy(itemForm, 'notes', { empty: 'null' });
 
 	const typeOptions: FormSelectOption[] = [
 		{ value: 'subscription', label: 'Subscription' },
@@ -60,227 +80,247 @@
 		...currencies.map((code) => ({ value: code, label: code }))
 	]);
 
-	const needsBilling = $derived(type === 'subscription' || type === 'hybrid');
-	const needsExpiry = $derived(type === 'expiry' || type === 'hybrid');
-	const needsCustomDays = $derived(billingCycle === 'custom_days');
+	const needsBilling = $derived($formData.type === 'subscription' || $formData.type === 'hybrid');
+	const needsExpiry = $derived($formData.type === 'expiry' || $formData.type === 'hybrid');
+	const needsCustomDays = $derived($billingCycle === 'custom_days');
 
-	function fieldError(name: keyof TrackedItemInput): string | undefined {
-		const errors = form.errors[name];
-		return Array.isArray(errors) ? errors[0] : undefined;
-	}
+	$effect(() => {
+		if (!needsBilling) {
+			$billingCycle = '';
+			$billingAnchorDate = '';
+			$customCycleDays = '';
+		} else if (!$billingCycle) {
+			$billingCycle = 'monthly';
+		}
+
+		if (!needsExpiry) {
+			$expiryDate = '';
+		}
+
+		if (!needsCustomDays) {
+			$customCycleDays = '';
+		}
+	});
 </script>
 
-<form method="POST" {action} class="space-y-5" data-enhanced={enhanced ? 'true' : undefined}>
+<form
+	method="POST"
+	{action}
+	use:enhance
+	class="space-y-5"
+	data-enhanced={enhanced ? 'true' : undefined}
+>
 	{#if hiddenUpdatedAt}
 		<input type="hidden" name="updated_at" value={hiddenUpdatedAt} />
 	{/if}
 
-	<div class="space-y-2">
-		<Label for="name">Name</Label>
-		<Input
-			id="name"
-			name="name"
-			required
-			minlength={1}
-			maxlength={200}
-			value={form.data.name ?? ''}
-			aria-invalid={fieldError('name') ? 'true' : undefined}
-		/>
-		{#if fieldError('name')}
-			<p class="text-sm text-destructive" role="alert">{fieldError('name')}</p>
-		{/if}
-	</div>
+	<Form.Field form={itemForm} name="name">
+		<Form.Control id="name">
+			{#snippet children({ props })}
+				<Form.Label>Name</Form.Label>
+				<Input {...props} required minlength={1} maxlength={200} bind:value={$formData.name} />
+			{/snippet}
+		</Form.Control>
+		<Form.FieldErrors />
+	</Form.Field>
 
 	<div class="grid gap-4 sm:grid-cols-2">
-		<div class="space-y-2">
-			<Label for="type">Type</Label>
-			<FormSelect
-				id="type"
-				name="type"
-				bind:value={type}
-				options={typeOptions}
-				invalid={Boolean(fieldError('type'))}
-			/>
-			{#if fieldError('type')}
-				<p class="text-sm text-destructive" role="alert">{fieldError('type')}</p>
-			{/if}
-		</div>
+		<Form.Field form={itemForm} name="type">
+			<Form.Control id="type">
+				{#snippet children({ props })}
+					<Form.Label>Type</Form.Label>
+					<FormSelect
+						id={props.id}
+						name={props.name}
+						bind:value={$formData.type}
+						options={typeOptions}
+						ariaDescribedBy={props['aria-describedby']}
+						invalid={props['aria-invalid'] === 'true'}
+					/>
+				{/snippet}
+			</Form.Control>
+			<Form.FieldErrors />
+		</Form.Field>
 
-		<div class="space-y-2">
-			<Label for="status">Status</Label>
-			<FormSelect
-				id="status"
-				name="status"
-				bind:value={status}
-				options={statusOptions}
-				invalid={Boolean(fieldError('status'))}
-			/>
-			{#if fieldError('status')}
-				<p class="text-sm text-destructive" role="alert">{fieldError('status')}</p>
-			{/if}
-		</div>
+		<Form.Field form={itemForm} name="status">
+			<Form.Control id="status">
+				{#snippet children({ props })}
+					<Form.Label>Status</Form.Label>
+					<FormSelect
+						id={props.id}
+						name={props.name}
+						bind:value={$formData.status}
+						options={statusOptions}
+						ariaDescribedBy={props['aria-describedby']}
+						invalid={props['aria-invalid'] === 'true'}
+					/>
+				{/snippet}
+			</Form.Control>
+			<Form.FieldErrors />
+		</Form.Field>
 	</div>
 
-	{#key type}
+	{#key $formData.type}
 		{#if needsBilling}
 			<div class="grid gap-4 sm:grid-cols-2">
-				<div class="space-y-2">
-					<Label for="billing_cycle">Billing cycle</Label>
-					<FormSelect
-						id="billing_cycle"
-						name="billing_cycle"
-						bind:value={billingCycle}
-						options={billingCycleOptions}
-						invalid={Boolean(fieldError('billing_cycle'))}
-					/>
-					{#if fieldError('billing_cycle')}
-						<p class="text-sm text-destructive" role="alert">{fieldError('billing_cycle')}</p>
-					{/if}
-				</div>
+				<Form.Field form={itemForm} name="billing_cycle">
+					<Form.Control id="billing_cycle">
+						{#snippet children({ props })}
+							<Form.Label>Billing cycle</Form.Label>
+							<FormSelect
+								id={props.id}
+								name={props.name}
+								bind:value={$billingCycle}
+								options={billingCycleOptions}
+								ariaDescribedBy={props['aria-describedby']}
+								invalid={props['aria-invalid'] === 'true'}
+							/>
+						{/snippet}
+					</Form.Control>
+					<Form.FieldErrors />
+				</Form.Field>
 
-				<div class="space-y-2">
-					<Label for="billing_anchor_date">Billing anchor date</Label>
-					<DatePicker
-						id="billing_anchor_date"
-						name="billing_anchor_date"
-						min="1900-01-01"
-						max="2100-12-31"
-						value={form.data.billing_anchor_date ?? ''}
-						invalid={Boolean(fieldError('billing_anchor_date'))}
-					/>
-					{#if fieldError('billing_anchor_date')}
-						<p class="text-sm text-destructive" role="alert">{fieldError('billing_anchor_date')}</p>
-					{/if}
-				</div>
+				<Form.Field form={itemForm} name="billing_anchor_date">
+					<Form.Control id="billing_anchor_date">
+						{#snippet children({ props })}
+							<Form.Label>Billing anchor date</Form.Label>
+							<DatePicker
+								id={props.id}
+								name={props.name}
+								min="1900-01-01"
+								max="2100-12-31"
+								bind:value={$billingAnchorDate}
+								ariaDescribedBy={props['aria-describedby']}
+								invalid={props['aria-invalid'] === 'true'}
+							/>
+						{/snippet}
+					</Form.Control>
+					<Form.FieldErrors />
+				</Form.Field>
 			</div>
 
 			{#if needsCustomDays}
-				<div class="space-y-2">
-					<Label for="custom_cycle_days">Every (days)</Label>
-					<Input
-						id="custom_cycle_days"
-						name="custom_cycle_days"
-						type="number"
-						min="1"
-						max="3650"
-						step="1"
-						required
-						value={form.data.custom_cycle_days ?? ''}
-						aria-invalid={fieldError('custom_cycle_days') ? 'true' : undefined}
-					/>
-					{#if fieldError('custom_cycle_days')}
-						<p class="text-sm text-destructive" role="alert">{fieldError('custom_cycle_days')}</p>
-					{/if}
-				</div>
+				<Form.Field form={itemForm} name="custom_cycle_days">
+					<Form.Control id="custom_cycle_days">
+						{#snippet children({ props })}
+							<Form.Label>Every (days)</Form.Label>
+							<Input
+								{...props}
+								type="number"
+								min="1"
+								max="3650"
+								step="1"
+								required
+								bind:value={$customCycleDays}
+							/>
+						{/snippet}
+					</Form.Control>
+					<Form.FieldErrors />
+				</Form.Field>
 			{/if}
 		{/if}
 	{/key}
 
-	{#key type}
+	{#key $formData.type}
 		{#if needsExpiry}
-			<div class="space-y-2">
-				<Label for="expiry_date">Expiry date</Label>
-				<DatePicker
-					id="expiry_date"
-					name="expiry_date"
-					min="1900-01-01"
-					max="2100-12-31"
-					value={form.data.expiry_date ?? ''}
-					invalid={Boolean(fieldError('expiry_date'))}
-				/>
-				{#if fieldError('expiry_date')}
-					<p class="text-sm text-destructive" role="alert">{fieldError('expiry_date')}</p>
-				{/if}
-			</div>
+			<Form.Field form={itemForm} name="expiry_date">
+				<Form.Control id="expiry_date">
+					{#snippet children({ props })}
+						<Form.Label>Expiry date</Form.Label>
+						<DatePicker
+							id={props.id}
+							name={props.name}
+							min="1900-01-01"
+							max="2100-12-31"
+							bind:value={$expiryDate}
+							ariaDescribedBy={props['aria-describedby']}
+							invalid={props['aria-invalid'] === 'true'}
+						/>
+					{/snippet}
+				</Form.Control>
+				<Form.FieldErrors />
+			</Form.Field>
 		{/if}
 	{/key}
 
 	<div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_10rem]">
-		<div class="space-y-2">
-			<Label for="amount">Amount</Label>
-			<Input
-				id="amount"
-				name="amount"
-				type="number"
-				min="0"
-				max="9999999999.99"
-				step="0.01"
-				value={form.data.amount ?? ''}
-				aria-invalid={fieldError('amount') ? 'true' : undefined}
-			/>
-			{#if fieldError('amount')}
-				<p class="text-sm text-destructive" role="alert">{fieldError('amount')}</p>
-			{/if}
-		</div>
+		<Form.Field form={itemForm} name="amount">
+			<Form.Control id="amount">
+				{#snippet children({ props })}
+					<Form.Label>Amount</Form.Label>
+					<Input
+						{...props}
+						type="number"
+						min="0"
+						max="9999999999.99"
+						step="0.01"
+						bind:value={$amount}
+					/>
+				{/snippet}
+			</Form.Control>
+			<Form.FieldErrors />
+		</Form.Field>
 
-		<div class="space-y-2">
-			<Label for="currency">Currency</Label>
-			<FormSelect
-				id="currency"
-				name="currency"
-				bind:value={currency}
-				options={currencyOptions}
-				invalid={Boolean(fieldError('currency'))}
-			/>
-			{#if fieldError('currency')}
-				<p class="text-sm text-destructive" role="alert">{fieldError('currency')}</p>
-			{/if}
-		</div>
+		<Form.Field form={itemForm} name="currency">
+			<Form.Control id="currency">
+				{#snippet children({ props })}
+					<Form.Label>Currency</Form.Label>
+					<FormSelect
+						id={props.id}
+						name={props.name}
+						bind:value={$currency}
+						options={currencyOptions}
+						ariaDescribedBy={props['aria-describedby']}
+						invalid={props['aria-invalid'] === 'true'}
+					/>
+				{/snippet}
+			</Form.Control>
+			<Form.FieldErrors />
+		</Form.Field>
 	</div>
 
 	<div class="grid gap-4 sm:grid-cols-2">
-		<div class="space-y-2">
-			<Label for="category">Category</Label>
-			<Input
-				id="category"
-				name="category"
-				maxlength={200}
-				value={form.data.category ?? ''}
-				aria-invalid={fieldError('category') ? 'true' : undefined}
-			/>
-			{#if fieldError('category')}
-				<p class="text-sm text-destructive" role="alert">{fieldError('category')}</p>
-			{/if}
-		</div>
+		<Form.Field form={itemForm} name="category">
+			<Form.Control id="category">
+				{#snippet children({ props })}
+					<Form.Label>Category</Form.Label>
+					<Input {...props} maxlength={200} bind:value={$category} />
+				{/snippet}
+			</Form.Control>
+			<Form.FieldErrors />
+		</Form.Field>
 
-		<div class="space-y-2">
-			<Label for="provider">Provider</Label>
-			<Input
-				id="provider"
-				name="provider"
-				maxlength={200}
-				value={form.data.provider ?? ''}
-				aria-invalid={fieldError('provider') ? 'true' : undefined}
-			/>
-			{#if fieldError('provider')}
-				<p class="text-sm text-destructive" role="alert">{fieldError('provider')}</p>
-			{/if}
-		</div>
+		<Form.Field form={itemForm} name="provider">
+			<Form.Control id="provider">
+				{#snippet children({ props })}
+					<Form.Label>Provider</Form.Label>
+					<Input {...props} maxlength={200} bind:value={$provider} />
+				{/snippet}
+			</Form.Control>
+			<Form.FieldErrors />
+		</Form.Field>
 	</div>
 
-	<div class="space-y-2">
-		<Label for="notes">Notes</Label>
-		<Textarea
-			id="notes"
-			name="notes"
-			maxlength={5000}
-			rows={4}
-			value={form.data.notes ?? ''}
-			aria-invalid={fieldError('notes') ? 'true' : undefined}
-		/>
-		{#if fieldError('notes')}
-			<p class="text-sm text-destructive" role="alert">{fieldError('notes')}</p>
-		{/if}
-	</div>
+	<Form.Field form={itemForm} name="notes">
+		<Form.Control id="notes">
+			{#snippet children({ props })}
+				<Form.Label>Notes</Form.Label>
+				<Textarea {...props} maxlength={5000} rows={4} bind:value={$notes} />
+			{/snippet}
+		</Form.Control>
+		<Form.FieldErrors />
+	</Form.Field>
 
-	{#if form.errors._errors?.[0]}
+	{#if $errors._errors?.[0]}
 		<p
 			class="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
 			role="alert"
 		>
-			{form.errors._errors[0]}
+			{$errors._errors[0]}
 		</p>
 	{/if}
 
-	<Button type="submit" class="min-h-11 w-full sm:w-auto">{submitLabel}</Button>
+	<Button type="submit" class="min-h-11 w-full sm:w-auto" disabled={$submitting}>
+		{$submitting ? `${submitLabel}...` : submitLabel}
+	</Button>
 </form>

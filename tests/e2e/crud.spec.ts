@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 
 import { expect, signIn, test } from './helpers/auth';
+import { createE2EItem } from './helpers/supabase';
 
 type FillItem = (page: Page) => Promise<void>;
 
@@ -20,7 +21,9 @@ async function createItem(page: Page, name: string, fill: FillItem): Promise<voi
 	await fill(page);
 	await page.getByRole('button', { name: 'Create', exact: true }).click();
 
-	await expect(page.getByRole('heading', { name: `Edit ${name}` })).toBeVisible();
+	await expect(page).toHaveURL(/\/$/);
+	await expect(page.getByRole('link', { name }).first()).toBeVisible();
+	await expect(page.getByText('Item created')).toBeVisible();
 }
 
 async function chooseOption(page: Page, label: string, option: string): Promise<void> {
@@ -86,12 +89,45 @@ test('edits and deletes an item', async ({ page }) => {
 		await setDateField(form, 'billing_anchor_date', '2026-06-01');
 	});
 
+	await page.getByRole('button', { name: `Open actions for ${name}` }).click();
+	await page.getByRole('menuitem', { name: 'Edit' }).click();
+	await expect(page.getByRole('heading', { name: `Edit ${name}` })).toBeVisible();
+
 	await page.getByLabel('Name').fill(updatedName);
 	await page.getByRole('button', { name: 'Save' }).click();
-	await expect(page.getByRole('heading', { name: `Edit ${updatedName}` })).toBeVisible();
+	await expect(page).toHaveURL(/\/$/);
+	await expect(page.getByRole('link', { name: updatedName }).first()).toBeVisible();
+	await expect(page.getByText('Item saved')).toBeVisible();
 
-	await page.getByRole('button', { name: 'Delete', exact: true }).click();
+	await page.getByRole('button', { name: `Open actions for ${updatedName}` }).click();
+	await page.getByRole('menuitem', { name: 'Delete' }).click();
 	await page.getByRole('button', { name: 'Delete item' }).click();
 	await expect(page).toHaveURL(/\/$/);
+	await expect(page.getByText('Item deleted')).toBeVisible();
 	await expect(page.getByText(updatedName)).toHaveCount(0);
+});
+
+test('opens edit page from dashboard row actions', async ({ page, testUser }) => {
+	const name = `Action Edit ${crypto.randomUUID()}`;
+	await createE2EItem(testUser.id, { name });
+	await page.goto('/');
+
+	await page.getByRole('button', { name: `Open actions for ${name}` }).click();
+	await page.getByRole('menuitem', { name: 'Edit' }).click();
+
+	await expect(page.getByRole('heading', { name: `Edit ${name}` })).toBeVisible();
+});
+
+test('deletes an item from dashboard row actions', async ({ page, testUser }) => {
+	const name = `Action Delete ${crypto.randomUUID()}`;
+	await createE2EItem(testUser.id, { name });
+	await page.goto('/');
+
+	await page.getByRole('button', { name: `Open actions for ${name}` }).click();
+	await page.getByRole('menuitem', { name: 'Delete' }).click();
+	await page.getByRole('button', { name: 'Delete item' }).click();
+
+	await expect(page).toHaveURL(/\/$/);
+	await expect(page.getByText('Item deleted')).toBeVisible();
+	await expect(page.getByText(name)).toHaveCount(0);
 });

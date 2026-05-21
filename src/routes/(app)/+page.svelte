@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { toast } from 'svelte-sonner';
+
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import Filters from '$lib/components/Filters.svelte';
 	import ItemCardList from '$lib/components/ItemCardList.svelte';
@@ -8,6 +11,12 @@
 	import { Button } from '$lib/components/ui/button';
 
 	let { data } = $props();
+
+	onMount(() => {
+		if (data.flash?.type === 'success') {
+			toast.success(data.flash.message);
+		}
+	});
 </script>
 
 <svelte:head>

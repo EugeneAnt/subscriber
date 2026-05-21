@@ -17,6 +17,7 @@
 		options: FormSelectOption[];
 		placeholder?: string;
 		ariaLabel?: string;
+		ariaDescribedBy?: string;
 		invalid?: boolean;
 		class?: string;
 		contentClass?: string;
@@ -29,6 +30,7 @@
 		options,
 		placeholder = 'Select an option',
 		ariaLabel,
+		ariaDescribedBy,
 		invalid = false,
 		class: className,
 		contentClass
@@ -43,6 +45,7 @@
 	<Select.Trigger
 		{id}
 		aria-label={ariaLabel}
+		aria-describedby={ariaDescribedBy}
 		aria-invalid={invalid ? 'true' : undefined}
 		class={cn('w-full', className)}
 	>

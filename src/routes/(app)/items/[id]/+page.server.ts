@@ -2,6 +2,7 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 
 import { classifyError } from '$lib/server/errors';
+import { setFlash } from '$lib/server/flash';
 import {
 	setFormError,
 	trackedItemFormAdapter,
@@ -43,7 +44,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 };
 
 export const actions: Actions = {
-	update: async ({ request, params, locals }) => {
+	update: async ({ request, params, locals, cookies, url }) => {
 		if (!uuidPattern.test(params.id)) {
 			error(404, 'Not found');
 		}
@@ -82,15 +83,17 @@ export const actions: Actions = {
 			throw caught;
 		}
 
-		throw redirect(303, `/items/${params.id}`);
+		setFlash(cookies, 'item_saved', url.protocol === 'https:');
+		throw redirect(303, '/');
 	},
 
-	delete: async ({ params, locals }) => {
+	delete: async ({ params, locals, cookies, url }) => {
 		if (!uuidPattern.test(params.id)) {
 			error(404, 'Not found');
 		}
 
 		await deleteItem(locals.supabase, params.id);
+		setFlash(cookies, 'item_deleted', url.protocol === 'https:');
 		throw redirect(303, '/');
 	}
 };

@@ -2,6 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 
 import { classifyError } from '$lib/server/errors';
+import { setFlash } from '$lib/server/flash';
 import {
 	newTrackedItemForm,
 	setFormError,
@@ -27,7 +28,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ request, locals }) => {
+	default: async ({ request, locals, cookies, url }) => {
 		const form = await superValidate(request, trackedItemFormAdapter);
 
 		if (!form.valid) {
@@ -40,9 +41,8 @@ export const actions: Actions = {
 			throw redirect(303, '/login');
 		}
 
-		let id: string;
 		try {
-			id = await createItem(locals.supabase, { ...form.data, user_id: user.id });
+			await createItem(locals.supabase, { ...form.data, user_id: user.id });
 		} catch (error) {
 			if (classifyError(error) === 'constraint') {
 				return setFormError(form, 'Database rejected the submitted values.');
@@ -51,6 +51,7 @@ export const actions: Actions = {
 			throw error;
 		}
 
-		throw redirect(303, `/items/${id}`);
+		setFlash(cookies, 'item_created', url.protocol === 'https:');
+		throw redirect(303, '/');
 	}
 };

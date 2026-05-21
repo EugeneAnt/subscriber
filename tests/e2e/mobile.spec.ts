@@ -22,4 +22,13 @@ test('dashboard uses mobile cards with 44px tap targets', async ({ page, testUse
 		expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
 		expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
 	}
+
+	const actionButtons = page.getByRole('button', { name: /Open actions for/ });
+	await expect(actionButtons.first()).toBeVisible();
+
+	for (let index = 0; index < (await actionButtons.count()); index += 1) {
+		const box = await actionButtons.nth(index).boundingBox();
+		expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+		expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+	}
 });
