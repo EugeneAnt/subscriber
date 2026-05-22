@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { env as privateEnv } from '$env/dynamic/private';
 import type { Database } from '$lib/types/database';
+import { isTimestampFresh } from '$lib/provider-cost-freshness';
 
 import {
 	configuredProviderDefinitions,
@@ -101,12 +102,7 @@ export function isSnapshotFresh(
 	cacheMinutes: number,
 	now = new Date()
 ): boolean {
-	if (!latestFetchedAt) return false;
-
-	const fetched = new Date(latestFetchedAt).getTime();
-	if (Number.isNaN(fetched)) return false;
-
-	return now.getTime() - fetched < cacheMinutes * 60_000;
+	return isTimestampFresh(latestFetchedAt, cacheMinutes, now);
 }
 
 export function normalizeBudgetInput(input: {

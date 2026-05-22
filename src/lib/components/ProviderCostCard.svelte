@@ -1,9 +1,11 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	import ProviderCostLines from './ProviderCostLines.svelte';
 
 	import type { ProviderConnectionCard } from '$lib/server/provider-costs';
+	import { shouldAutoRefreshProviderCost } from '$lib/provider-cost-freshness';
 	import { Badge, type BadgeVariant } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -20,9 +22,11 @@
 	type Props = {
 		connection: ProviderConnectionCard;
 		lines?: Line[];
+		cacheMinutes?: number;
+		autoRefresh?: boolean;
 	};
 
-	let { connection, lines = [] }: Props = $props();
+	let { connection, lines = [], cacheMinutes = 60, autoRefresh = true }: Props = $props();
 	let cardOverride = $state<ProviderConnectionCard | null>(null);
 	let cardLinesOverride = $state<Line[] | null>(null);
 	let card = $derived(cardOverride ?? connection);
@@ -122,41 +126,38 @@
 		localError = null;
 	}
 
-	async function submitProviderForm(
-		form: HTMLFormElement,
-		url: string,
-		successMessage: string
-	): Promise<void> {
+	async function submitProviderData(url: string, body: FormData): Promise<void> {
 		const response = await fetch(url, {
 			method: 'POST',
-			body: new FormData(form),
+			body,
 			headers: { accept: 'application/json' }
 		});
 
 		applyProviderCostPayload(await readProviderCostPayload(response));
-		toast.success(successMessage);
 	}
 
-	async function refreshProvider(event: SubmitEvent): Promise<void> {
-		event.preventDefault();
-		const form = event.currentTarget;
-		if (!(form instanceof HTMLFormElement)) return;
+	async function refreshCurrentProvider(options = { notify: true }): Promise<void> {
+		if (refreshPending) return;
 
 		refreshPending = true;
 		localError = null;
 
 		try {
-			await submitProviderForm(
-				form,
-				`/provider-costs/${card.id}/refresh`,
-				'Provider costs refreshed.'
-			);
+			const body = new FormData();
+			body.set('connection_id', card.id);
+			await submitProviderData(`/provider-costs/${card.id}/refresh`, body);
+			if (options.notify) toast.success('Provider costs refreshed.');
 		} catch (error) {
 			localError = error instanceof Error ? error.message : 'Provider refresh failed.';
-			toast.error(localError);
+			if (options.notify) toast.error(localError);
 		} finally {
 			refreshPending = false;
 		}
+	}
+
+	async function refreshProvider(event: SubmitEvent): Promise<void> {
+		event.preventDefault();
+		await refreshCurrentProvider();
 	}
 
 	async function saveBudget(event: SubmitEvent): Promise<void> {
@@ -168,7 +169,8 @@
 		localError = null;
 
 		try {
-			await submitProviderForm(form, `/provider-costs/${card.id}/budget`, 'Budget saved.');
+			await submitProviderData(`/provider-costs/${card.id}/budget`, new FormData(form));
+			toast.success('Budget saved.');
 		} catch (error) {
 			localError = error instanceof Error ? error.message : 'Budget settings could not be saved.';
 			toast.error(localError);
@@ -176,6 +178,12 @@
 			budgetPending = false;
 		}
 	}
+
+	onMount(() => {
+		if (autoRefresh && shouldAutoRefreshProviderCost(card, cacheMinutes)) {
+			void refreshCurrentProvider({ notify: false });
+		}
+	});
 </script>
 
 <article

@@ -16,7 +16,6 @@ import {
 	cacheMinutesFromEnv,
 	ensureConfiguredProviderConnections,
 	isAnyProviderCostSyncConfigured,
-	isSnapshotFresh,
 	listLatestProviderCostLines,
 	listProviderConnections,
 	normalizeBudgetInput,
@@ -57,6 +56,7 @@ type PaygPanelData = {
 	connections: ProviderConnections;
 	linesByConnection: ProviderLinesByConnection;
 	configured: boolean;
+	cacheMinutes: number;
 	error: string | null;
 };
 
@@ -69,26 +69,16 @@ async function loadPaygPanelData(locals: App.Locals, userId: string): Promise<Pa
 			connections: [],
 			linesByConnection: {},
 			configured: false,
+			cacheMinutes: cacheMinutesFromEnv(),
 			error: null
 		};
 	}
 
 	try {
 		await ensureConfiguredProviderConnections(locals.supabase, userId, definitions);
-		let connections = await listProviderConnections(locals.supabase);
-
 		const cacheMinutes = cacheMinutesFromEnv();
-		for (const connection of connections) {
-			if (!isSnapshotFresh(connection.latest_fetched_at, cacheMinutes)) {
-				try {
-					await refreshProviderCost(locals.supabase, userId, connection.id);
-				} catch {
-					// The helper stores sync error metadata; keep old snapshot data visible.
-				}
-			}
-		}
+		const connections = await listProviderConnections(locals.supabase);
 
-		connections = await listProviderConnections(locals.supabase);
 		return {
 			connections,
 			linesByConnection: await listLatestProviderCostLines(
@@ -96,6 +86,7 @@ async function loadPaygPanelData(locals: App.Locals, userId: string): Promise<Pa
 				connections.map((connection) => connection.id)
 			),
 			configured,
+			cacheMinutes,
 			error: null
 		};
 	} catch (loadError) {
@@ -103,6 +94,7 @@ async function loadPaygPanelData(locals: App.Locals, userId: string): Promise<Pa
 			connections: [],
 			linesByConnection: {},
 			configured,
+			cacheMinutes: cacheMinutesFromEnv(),
 			error: loadError instanceof Error ? loadError.message : 'Provider costs could not load.'
 		};
 	}
@@ -140,6 +132,7 @@ export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 		connections: [],
 		linesByConnection: {},
 		configured: providerConfigured,
+		cacheMinutes: cacheMinutesFromEnv(),
 		error: null
 	});
 

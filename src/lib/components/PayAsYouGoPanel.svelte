@@ -11,6 +11,7 @@
 		connections: ProviderConnectionCard[];
 		linesByConnection: Record<string, Line[]>;
 		configured: boolean;
+		cacheMinutes?: number;
 		loading?: boolean;
 		error?: string | null;
 	};
@@ -19,6 +20,7 @@
 		connections,
 		linesByConnection,
 		configured,
+		cacheMinutes = 60,
 		loading = false,
 		error = null
 	}: Props = $props();
@@ -28,7 +30,7 @@
 	<div>
 		<h2 id="payg-heading" class="text-lg font-semibold">Pay-as-you-go</h2>
 		<p class="text-sm text-muted-foreground">
-			Provider-reported variable spend. Values are cached and refreshed on demand.
+			Provider-reported variable spend. Cached values refresh automatically when stale.
 		</p>
 	</div>
 
@@ -61,7 +63,11 @@
 	{:else}
 		<div class="space-y-4">
 			{#each connections as connection (connection.id)}
-				<ProviderCostCard {connection} lines={linesByConnection[connection.id] ?? []} />
+				<ProviderCostCard
+					{connection}
+					lines={linesByConnection[connection.id] ?? []}
+					{cacheMinutes}
+				/>
 			{/each}
 		</div>
 	{/if}

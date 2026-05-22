@@ -68,6 +68,7 @@
 				connections={paygData.connections}
 				linesByConnection={paygData.linesByConnection}
 				configured={paygData.configured}
+				cacheMinutes={paygData.cacheMinutes}
 				error={paygData.error}
 			/>
 		{/await}
