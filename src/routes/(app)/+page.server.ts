@@ -11,6 +11,7 @@ import {
 	todayIso
 } from '$lib/server/dashboard';
 import { consumeFlash, setFlash } from '$lib/server/flash';
+import { isUuid } from '$lib/server/ids';
 import {
 	cacheMinutesFromEnv,
 	ensureConfiguredProviderConnections,
@@ -33,7 +34,6 @@ import {
 } from '$lib/server/tracked-items';
 import type { Actions, PageServerLoad } from './$types';
 
-const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const dashboardTabs = new Set(['subscriptions', 'payg']);
 
 function parseDashboardTab(url: URL): 'subscriptions' | 'payg' {
@@ -199,7 +199,7 @@ export const actions: Actions = {
 		const formData = await request.formData();
 		const id = String(formData.get('id') ?? '');
 
-		if (!uuidPattern.test(id)) {
+		if (!isUuid(id)) {
 			error(404, 'Not found');
 		}
 
@@ -211,7 +211,7 @@ export const actions: Actions = {
 		const formData = await request.formData();
 		const connectionId = String(formData.get('connection_id') ?? '');
 
-		if (!uuidPattern.test(connectionId)) {
+		if (!isUuid(connectionId)) {
 			return fail(400, { error: 'Invalid provider connection.' });
 		}
 
@@ -230,7 +230,7 @@ export const actions: Actions = {
 		const formData = await request.formData();
 		const connectionId = String(formData.get('connection_id') ?? '');
 
-		if (!uuidPattern.test(connectionId)) {
+		if (!isUuid(connectionId)) {
 			return fail(400, { error: 'Invalid provider connection.' });
 		}
 

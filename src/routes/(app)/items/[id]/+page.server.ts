@@ -3,6 +3,7 @@ import { superValidate } from 'sveltekit-superforms/server';
 
 import { classifyError } from '$lib/server/errors';
 import { setFlash } from '$lib/server/flash';
+import { isUuid } from '$lib/server/ids';
 import {
 	setFormError,
 	trackedItemFormAdapter,
@@ -11,10 +12,8 @@ import {
 import { deleteItem, getById, updateItem } from '$lib/server/tracked-items';
 import type { Actions, PageServerLoad } from './$types';
 
-const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 export const load: PageServerLoad = async ({ params, locals }) => {
-	if (!uuidPattern.test(params.id)) {
+	if (!isUuid(params.id)) {
 		error(404, 'Not found');
 	}
 
@@ -45,7 +44,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
 export const actions: Actions = {
 	update: async ({ request, params, locals, cookies, url }) => {
-		if (!uuidPattern.test(params.id)) {
+		if (!isUuid(params.id)) {
 			error(404, 'Not found');
 		}
 
@@ -88,7 +87,7 @@ export const actions: Actions = {
 	},
 
 	delete: async ({ params, locals, cookies, url }) => {
-		if (!uuidPattern.test(params.id)) {
+		if (!isUuid(params.id)) {
 			error(404, 'Not found');
 		}
 

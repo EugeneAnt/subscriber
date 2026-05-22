@@ -3,6 +3,7 @@ import { createClient, type User } from '@supabase/supabase-js';
 import type { Database } from '../../../src/lib/types/database';
 
 type TrackedItemInsert = Database['public']['Tables']['tracked_items']['Insert'];
+type ProviderConnectionInsert = Database['public']['Tables']['provider_connections']['Insert'];
 
 export type E2EUser = {
 	id: string;
@@ -104,6 +105,35 @@ export async function createE2EItem(
 	};
 
 	const { data, error } = await admin.from('tracked_items').insert(input).select('id').single();
+
+	if (error) {
+		throw error;
+	}
+
+	return data.id;
+}
+
+export async function createE2EProviderConnection(
+	userId: string,
+	patch: Partial<ProviderConnectionInsert> = {}
+): Promise<string> {
+	const input: ProviderConnectionInsert = {
+		user_id: userId,
+		provider_code: 'openai',
+		display_name: `E2E Provider ${crypto.randomUUID()}`,
+		credential_source: 'server_env',
+		credential_name: 'OPENAI_ADMIN_KEY',
+		currency: 'USD',
+		warning_remaining_amount: 5,
+		critical_remaining_amount: 1,
+		...patch
+	};
+
+	const { data, error } = await admin
+		.from('provider_connections')
+		.insert(input)
+		.select('id')
+		.single();
 
 	if (error) {
 		throw error;

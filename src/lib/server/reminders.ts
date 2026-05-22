@@ -1,13 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { Database } from '$lib/types/database';
+import { isUuid } from './ids';
 
 type Client = Pick<SupabaseClient<Database>, 'from'>;
 type ReminderStateInsert = Database['public']['Tables']['reminder_states']['Insert'];
 type ReminderStateUpdate = Database['public']['Tables']['reminder_states']['Update'];
 type ReminderViewRow = Database['public']['Views']['tracked_item_reminders_v']['Row'];
 
-const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/;
 const allowedLeadDays = new Set([1, 7]);
 
@@ -56,7 +56,7 @@ export function parseReminderKey(formData: FormData): ReminderKey {
 	const leadDaysValue = Number(formValue(formData, 'lead_days'));
 
 	if (
-		!uuidPattern.test(tracked_item_id) ||
+		!isUuid(tracked_item_id) ||
 		event_kind !== 'billing' ||
 		!isValidIsoDate(event_date) ||
 		!allowedLeadDays.has(leadDaysValue)
