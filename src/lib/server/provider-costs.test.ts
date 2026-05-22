@@ -32,23 +32,31 @@ describe('provider cost helpers', () => {
 	test('resolves configured provider credentials from explicit env maps', () => {
 		expect(credentialNameForProvider('openai')).toBe('OPENAI_ADMIN_KEY');
 		expect(credentialNameForProvider('anthropic')).toBe('ANTHROPIC_ADMIN_KEY');
+		expect(credentialNameForProvider('xai')).toBe('XAI_MANAGEMENT_KEY');
 		expect(
 			configuredProviderDefinitions({
 				OPENAI_ADMIN_KEY: ' sk-admin-test ',
-				ANTHROPIC_ADMIN_KEY: ''
+				ANTHROPIC_ADMIN_KEY: '',
+				XAI_MANAGEMENT_KEY: ''
 			}).map((provider) => provider.code)
 		).toEqual(['openai']);
 		expect(
 			configuredProviderDefinitions({
 				OPENAI_ADMIN_KEY: '',
-				ANTHROPIC_ADMIN_KEY: ' sk-ant-admin-test '
+				ANTHROPIC_ADMIN_KEY: ' sk-ant-admin-test ',
+				XAI_MANAGEMENT_KEY: ' xai-management-test '
 			}).map((provider) => provider.code)
-		).toEqual(['anthropic']);
+		).toEqual(['anthropic', 'xai']);
 		expect(
 			resolveServerEnvCredential('anthropic', 'ANTHROPIC_ADMIN_KEY', {
 				ANTHROPIC_ADMIN_KEY: ' sk-ant-admin-test '
 			})
 		).toBe('sk-ant-admin-test');
+		expect(
+			resolveServerEnvCredential('xai', 'XAI_MANAGEMENT_KEY', {
+				XAI_MANAGEMENT_KEY: ' xai-management-test '
+			})
+		).toBe('xai-management-test');
 		expect(
 			resolveServerEnvCredential('anthropic', 'OPENAI_ADMIN_KEY', {
 				OPENAI_ADMIN_KEY: 'sk-admin-test'

@@ -53,7 +53,7 @@
 	{:else if !configured}
 		<EmptyState
 			title="Provider cost sync is not configured"
-			body="Set OPENAI_ADMIN_KEY or ANTHROPIC_ADMIN_KEY in the server environment to enable pay-as-you-go cost cards."
+			body="Set at least one supported provider admin key in the server environment to enable pay-as-you-go cost cards."
 		/>
 	{:else if connections.length === 0}
 		<EmptyState

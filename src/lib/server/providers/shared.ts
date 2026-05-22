@@ -32,7 +32,7 @@ export function utcMonthWindow(now: Date): ProviderMonthWindow {
 }
 
 export function redactProviderSecrets(value: string): string {
-	return value.replace(/sk-[A-Za-z0-9_-]+/g, '[redacted]');
+	return value.replace(/\b(?:sk|xai)-[A-Za-z0-9_-]+\b/g, '[redacted]');
 }
 
 export function numericValue(value: unknown): number | null {

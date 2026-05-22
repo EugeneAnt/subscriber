@@ -1,3 +1,5 @@
+import { redactProviderSecrets } from './shared';
+
 export type ProviderErrorKind =
 	| 'not_configured'
 	| 'unauthorized'
@@ -25,7 +27,7 @@ export function safeProviderErrorMessage(error: unknown): string {
 	}
 
 	if (error instanceof Error) {
-		return error.message.replace(/sk-[A-Za-z0-9_-]+/g, '[redacted]');
+		return redactProviderSecrets(error.message);
 	}
 
 	return 'Provider sync failed.';

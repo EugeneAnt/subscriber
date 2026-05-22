@@ -55,16 +55,18 @@ describe('provider cost helpers', () => {
 	test('creates configured provider connections idempotently', async () => {
 		await ensureConfiguredProviderConnections(client, userId, [
 			providerDefinition('openai'),
-			providerDefinition('anthropic')
+			providerDefinition('anthropic'),
+			providerDefinition('xai')
 		]);
 		await ensureConfiguredProviderConnections(client, userId, [
 			providerDefinition('openai'),
-			providerDefinition('anthropic')
+			providerDefinition('anthropic'),
+			providerDefinition('xai')
 		]);
 
 		const rows = await listProviderConnections(client);
-		expect(rows).toHaveLength(2);
-		expect(rows.map((row) => row.provider_code).sort()).toEqual(['anthropic', 'openai']);
+		expect(rows).toHaveLength(3);
+		expect(rows.map((row) => row.provider_code).sort()).toEqual(['anthropic', 'openai', 'xai']);
 		expect(rows).toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({
@@ -75,6 +77,11 @@ describe('provider cost helpers', () => {
 				expect.objectContaining({
 					provider_code: 'openai',
 					display_name: 'OpenAI API',
+					budget_status: 'unknown'
+				}),
+				expect.objectContaining({
+					provider_code: 'xai',
+					display_name: 'xAI API',
 					budget_status: 'unknown'
 				})
 			])
@@ -207,6 +214,35 @@ describe('provider cost helpers', () => {
 		expect(linesByConnection[connection.id]).toEqual([
 			expect.objectContaining({
 				amount: 3.5,
+				currency: 'USD'
+			})
+		]);
+	});
+
+	test('refresh supports an injected xAI fixture', async () => {
+		await ensureConfiguredProviderConnections(client, userId, [providerDefinition('xai')]);
+		const [connection] = await listProviderConnections(client);
+
+		await refreshProviderCost(client, userId, connection.id, {
+			now: new Date('2026-05-22T10:00:00.000Z'),
+			fetchMonthToDateCost: async ({ adminKey }) => {
+				expect(adminKey).toBe('xai-management-provider-costs');
+				return fixtureCost(4.25, 'xai');
+			},
+			resolveCredential: () => 'xai-management-provider-costs'
+		});
+
+		const [updated] = await listProviderConnections(client);
+		expect(updated).toMatchObject({
+			provider_code: 'xai',
+			current_period_spend: 4.25,
+			current_period_currency: 'USD'
+		});
+
+		const linesByConnection = await listLatestProviderCostLines(client, [connection.id]);
+		expect(linesByConnection[connection.id]).toEqual([
+			expect.objectContaining({
+				amount: 4.25,
 				currency: 'USD'
 			})
 		]);

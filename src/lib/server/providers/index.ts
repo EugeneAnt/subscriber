@@ -3,12 +3,14 @@ import { env as privateEnv } from '$env/dynamic/private';
 import { anthropicProvider } from './anthropic';
 import { openaiProvider } from './openai';
 import type { ProviderCode, ProviderDefinition } from './types';
+import { xaiProvider } from './xai';
 
 type EnvLike = Record<string, string | undefined>;
 
 export const providerDefinitions = {
 	openai: openaiProvider,
-	anthropic: anthropicProvider
+	anthropic: anthropicProvider,
+	xai: xaiProvider
 } satisfies Record<ProviderCode, ProviderDefinition>;
 
 export function providerCodes(): ProviderCode[] {

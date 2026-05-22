@@ -1,4 +1,4 @@
-export type ProviderCode = 'openai' | 'anthropic';
+export type ProviderCode = 'openai' | 'anthropic' | 'xai';
 
 export type ProviderCapability =
 	| 'costs'
