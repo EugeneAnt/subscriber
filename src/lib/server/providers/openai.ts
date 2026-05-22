@@ -114,11 +114,30 @@ async function readPage(response: Response): Promise<OpenAICostPage> {
 	}
 }
 
+function amountValue(value: unknown): number | null {
+	if (typeof value === 'number') {
+		return Number.isFinite(value) ? value : null;
+	}
+
+	if (typeof value !== 'string') {
+		return null;
+	}
+
+	const trimmed = value.trim();
+	if (trimmed === '') {
+		return null;
+	}
+
+	const parsed = Number(trimmed);
+	return Number.isFinite(parsed) ? parsed : null;
+}
+
 function amountFromResult(result: OpenAICostResult): { value: number; currency: string } {
 	const value = result.amount?.value;
 	const currency = result.amount?.currency;
+	const parsedValue = amountValue(value);
 
-	if (typeof value !== 'number' || !Number.isFinite(value) || typeof currency !== 'string') {
+	if (parsedValue === null || typeof currency !== 'string') {
 		throw new ProviderSyncError('bad_response', 'OpenAI Costs API returned a malformed amount.');
 	}
 
@@ -130,7 +149,7 @@ function amountFromResult(result: OpenAICostResult): { value: number; currency: 
 		);
 	}
 
-	return { value, currency: normalizedCurrency };
+	return { value: parsedValue, currency: normalizedCurrency };
 }
 
 function sanitizeResult(result: OpenAICostResult): OpenAICostResult {

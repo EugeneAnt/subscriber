@@ -43,7 +43,7 @@ describe('OpenAI provider adapter', () => {
 							},
 							{
 								object: 'organization.costs.result',
-								amount: { value: 2.5, currency: 'usd' },
+								amount: { value: '2.5', currency: 'usd' },
 								line_item: 'image',
 								project_id: 'proj_image'
 							}
@@ -88,6 +88,29 @@ describe('OpenAI provider adapter', () => {
 			})
 		]);
 		expect(JSON.stringify(result.rawSummary)).not.toContain('sk-admin-test');
+	});
+
+	test('normalizes string amounts returned by the live costs endpoint', async () => {
+		const result = await fetchOpenAIMonthToDateCost({
+			adminKey: 'sk-admin-test',
+			now: new Date('2026-05-22T13:30:00.000Z'),
+			fetch: async () =>
+				jsonResponse({
+					has_more: false,
+					next_page: null,
+					data: [
+						{
+							results: [
+								{ amount: { value: '0.0002760000000000000000000000000000000', currency: 'usd' } },
+								{ amount: { value: '0E-6176', currency: 'usd' } }
+							]
+						}
+					]
+				})
+		});
+
+		expect(result.totalAmount).toBe(0.000276);
+		expect(result.lines.map((line) => line.amount)).toEqual([0.000276, 0]);
 	});
 
 	test('follows cursor pagination', async () => {
