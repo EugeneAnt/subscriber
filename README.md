@@ -10,6 +10,7 @@ It uses Supabase for Auth, Postgres, PostgREST, and Row Level Security. The app 
 - Unified tracked items for subscriptions, expiry-only items, and hybrid items
 - Dashboard summary tiles, upcoming events, filters, desktop table, and mobile card list
 - In-app payment reminders 7 days and 1 day before upcoming billing dates
+- Optional OpenAI API pay-as-you-go cost sync with monthly budget status
 - Calendar-aware billing rollover in Postgres
 - Per-currency monthly and annualized burn views
 - Server-side validation with Valibot and sveltekit-superforms
@@ -42,9 +43,15 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 ORIGIN=https://your-app.example.com
 BODY_SIZE_LIMIT=524288
+
+# Optional: enables the Pay-as-you-go OpenAI API cost tab.
+OPENAI_ADMIN_KEY=<optional-openai-admin-key>
+PROVIDER_COST_CACHE_MINUTES=60
 ```
 
 `SUPABASE_ANON_KEY` is still accepted as a legacy fallback for local or self-hosted Supabase setups. `SUPABASE_SERVICE_ROLE_KEY` is intentionally not used by the application runtime. Keep service-role or secret keys for local admin scripts and tests only.
+
+`OPENAI_ADMIN_KEY` is optional. The app starts without it and shows a configuration state on the Pay-as-you-go tab. The key is read only by SvelteKit server code and is never sent to the browser or stored in Supabase.
 
 For local development, copy `.env.example`:
 
@@ -185,6 +192,7 @@ docker run --rm \
   -e SUPABASE_PUBLISHABLE_KEY="your-publishable-key" \
   -e ORIGIN="http://localhost:3000" \
   -e BODY_SIZE_LIMIT="524288" \
+  -e PROVIDER_COST_CACHE_MINUTES="60" \
   subscriber
 ```
 
@@ -208,6 +216,7 @@ For any reverse proxy or hosted runtime:
 - route traffic to container port `3000`
 - set `ORIGIN` to the public app URL
 - set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`
+- optionally set `OPENAI_ADMIN_KEY` for OpenAI pay-as-you-go cost sync
 - never expose service-role keys to the app runtime
 
 ## License
