@@ -150,6 +150,26 @@ describe('OpenAI provider adapter', () => {
 		});
 	});
 
+	test('maps network and malformed JSON failures to provider errors', async () => {
+		await expect(
+			fetchOpenAIMonthToDateCost({
+				adminKey: 'sk-admin-test',
+				now: new Date('2026-05-22T13:30:00.000Z'),
+				fetch: async () => {
+					throw new TypeError('fetch failed');
+				}
+			})
+		).rejects.toMatchObject({ kind: 'network' });
+
+		await expect(
+			fetchOpenAIMonthToDateCost({
+				adminKey: 'sk-admin-test',
+				now: new Date('2026-05-22T13:30:00.000Z'),
+				fetch: async () => new Response('not json', { status: 200 })
+			})
+		).rejects.toMatchObject({ kind: 'bad_response' });
+	});
+
 	test('rejects unsupported and mixed currencies', async () => {
 		await expect(
 			fetchOpenAIMonthToDateCost({
