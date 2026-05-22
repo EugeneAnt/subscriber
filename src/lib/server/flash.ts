@@ -9,7 +9,9 @@ const flashMessages = {
 	reminder_read: 'Reminder marked read',
 	reminder_snoozed: 'Reminder snoozed',
 	reminder_dismissed: 'Reminder dismissed',
-	reminder_stale: 'Reminder is no longer current'
+	reminder_stale: 'Reminder is no longer current',
+	provider_refreshed: 'Provider cost refreshed',
+	provider_budget_saved: 'Provider budget saved'
 } as const;
 
 export type FlashKind = keyof typeof flashMessages;

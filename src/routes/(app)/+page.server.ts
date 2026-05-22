@@ -1,4 +1,4 @@
-import { error, redirect } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import {
 	getDashboardSummary,
 	getDistinctOptions,
@@ -10,6 +10,16 @@ import {
 	todayIso
 } from '$lib/server/dashboard';
 import { consumeFlash, setFlash } from '$lib/server/flash';
+import {
+	cacheMinutesFromEnv,
+	ensureOpenAiConnection,
+	isOpenAiCostSyncConfigured,
+	isSnapshotFresh,
+	listProviderConnections,
+	normalizeBudgetInput,
+	refreshOpenAiCost,
+	updateProviderBudget
+} from '$lib/server/provider-costs';
 import { safeRedirectPath } from '$lib/server/redirects';
 import { countUnreadReminders, listDueReminders } from '$lib/server/reminders';
 import {
@@ -21,6 +31,26 @@ import {
 import type { Actions, PageServerLoad } from './$types';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const dashboardTabs = new Set(['subscriptions', 'payg']);
+
+function parseDashboardTab(url: URL): 'subscriptions' | 'payg' {
+	const tab = url.searchParams.get('tab');
+	return dashboardTabs.has(tab ?? '') ? (tab as 'subscriptions' | 'payg') : 'subscriptions';
+}
+
+async function currentUserId(locals: App.Locals): Promise<string> {
+	const { user } = await locals.safeGetSession();
+
+	if (!user) {
+		throw redirect(303, '/login?next=%2F');
+	}
+
+	return user.id;
+}
+
+function secure(url: URL): boolean {
+	return url.protocol === 'https:';
+}
 
 function safeReferrerPath(request: Request, currentUrl: URL): string {
 	const referrer = request.headers.get('referer');
@@ -41,6 +71,7 @@ function safeReferrerPath(request: Request, currentUrl: URL): string {
 }
 
 export const load: PageServerLoad = async ({ locals, url, cookies }) => {
+	const tab = parseDashboardTab(url);
 	const filters = parseDashboardFilters(url.searchParams);
 	const flash = consumeFlash(cookies);
 	const today = todayIso();
@@ -65,7 +96,34 @@ export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	const { categories, providers } = getDistinctOptions(allItems);
 	const { activeCount, upcoming30Count } = getDashboardSummary(allItems, events, today);
 
+	let providerConnections: Awaited<ReturnType<typeof listProviderConnections>> = [];
+	let providerConfigured = false;
+
+	if (tab === 'payg') {
+		const userId = await currentUserId(locals);
+		providerConfigured = isOpenAiCostSyncConfigured();
+
+		if (providerConfigured) {
+			await ensureOpenAiConnection(locals.supabase, userId);
+			providerConnections = await listProviderConnections(locals.supabase);
+
+			const cacheMinutes = cacheMinutesFromEnv();
+			for (const connection of providerConnections) {
+				if (!isSnapshotFresh(connection.latest_fetched_at, cacheMinutes)) {
+					try {
+						await refreshOpenAiCost(locals.supabase, userId, connection.id);
+					} catch {
+						// The helper stores sync error metadata; keep old snapshot data visible.
+					}
+				}
+			}
+
+			providerConnections = await listProviderConnections(locals.supabase);
+		}
+	}
+
 	return {
+		tab,
 		items,
 		events,
 		today,
@@ -77,6 +135,9 @@ export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 		providers,
 		reminders: reminderRows,
 		reminderCount,
+		providerConnections,
+		providerConfigured,
+		providerLinesByConnection: {},
 		flash
 	};
 };
@@ -91,7 +152,54 @@ export const actions: Actions = {
 		}
 
 		await deleteItem(locals.supabase, id);
-		setFlash(cookies, 'item_deleted', url.protocol === 'https:');
+		setFlash(cookies, 'item_deleted', secure(url));
 		throw redirect(303, safeReferrerPath(request, url));
+	},
+	refreshProviderCost: async ({ locals, request, url, cookies }) => {
+		const formData = await request.formData();
+		const connectionId = String(formData.get('connection_id') ?? '');
+
+		if (!uuidPattern.test(connectionId)) {
+			return fail(400, { error: 'Invalid provider connection.' });
+		}
+
+		try {
+			await refreshOpenAiCost(locals.supabase, await currentUserId(locals), connectionId);
+			setFlash(cookies, 'provider_refreshed', secure(url));
+		} catch (providerError) {
+			return fail(400, {
+				error: providerError instanceof Error ? providerError.message : 'Provider refresh failed.'
+			});
+		}
+
+		throw redirect(303, '/?tab=payg');
+	},
+	updateProviderBudget: async ({ locals, request, url, cookies }) => {
+		const formData = await request.formData();
+		const connectionId = String(formData.get('connection_id') ?? '');
+
+		if (!uuidPattern.test(connectionId)) {
+			return fail(400, { error: 'Invalid provider connection.' });
+		}
+
+		try {
+			await updateProviderBudget(
+				locals.supabase,
+				connectionId,
+				normalizeBudgetInput({
+					monthly_budget: String(formData.get('monthly_budget') ?? ''),
+					warning_remaining_amount: String(formData.get('warning_remaining_amount') ?? ''),
+					critical_remaining_amount: String(formData.get('critical_remaining_amount') ?? '')
+				})
+			);
+			setFlash(cookies, 'provider_budget_saved', secure(url));
+		} catch (validationError) {
+			return fail(400, {
+				error:
+					validationError instanceof Error ? validationError.message : 'Invalid budget settings.'
+			});
+		}
+
+		throw redirect(303, '/?tab=payg');
 	}
 };
