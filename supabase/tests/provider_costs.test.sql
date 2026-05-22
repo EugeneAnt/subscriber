@@ -13,7 +13,7 @@ set local role authenticated;
 
 select set_eq(
   $$ select code from public.provider_catalog order by code $$,
-  array['anthropic', 'openai', 'xai'],
+  array['anthropic', 'openai', 'openrouter', 'xai'],
   'authenticated users can read supported provider catalog'
 );
 

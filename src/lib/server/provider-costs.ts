@@ -265,7 +265,7 @@ export async function listLatestProviderCostLines(
 
 	const output: Record<string, ProviderCostSnapshotLineRow[]> = {};
 
-	// Phase 3 has one OpenAI connection. Batch this if multi-provider usage makes it hot.
+	// Phase 3 keeps the provider count small. Batch this if multi-provider usage makes it hot.
 	for (const connectionId of connectionIds) {
 		const { data: snapshot, error: snapshotError } = await supabase
 			.from('provider_cost_snapshots')

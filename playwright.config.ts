@@ -41,6 +41,13 @@ if (env.E2E_XAI_MANAGEMENT_KEY) {
 	env.XAI_MANAGEMENT_KEY = '';
 }
 
+if (env.E2E_OPENROUTER_MANAGEMENT_KEY) {
+	env.OPENROUTER_MANAGEMENT_KEY = env.E2E_OPENROUTER_MANAGEMENT_KEY;
+} else {
+	// Keep default E2E runs on fixture/no-secret states; never call live OpenRouter by accident.
+	env.OPENROUTER_MANAGEMENT_KEY = '';
+}
+
 Object.assign(process.env, env);
 
 const port = env.E2E_PORT ?? '5173';

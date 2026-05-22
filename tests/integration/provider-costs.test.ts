@@ -56,17 +56,24 @@ describe('provider cost helpers', () => {
 		await ensureConfiguredProviderConnections(client, userId, [
 			providerDefinition('openai'),
 			providerDefinition('anthropic'),
-			providerDefinition('xai')
+			providerDefinition('xai'),
+			providerDefinition('openrouter')
 		]);
 		await ensureConfiguredProviderConnections(client, userId, [
 			providerDefinition('openai'),
 			providerDefinition('anthropic'),
-			providerDefinition('xai')
+			providerDefinition('xai'),
+			providerDefinition('openrouter')
 		]);
 
 		const rows = await listProviderConnections(client);
-		expect(rows).toHaveLength(3);
-		expect(rows.map((row) => row.provider_code).sort()).toEqual(['anthropic', 'openai', 'xai']);
+		expect(rows).toHaveLength(4);
+		expect(rows.map((row) => row.provider_code).sort()).toEqual([
+			'anthropic',
+			'openai',
+			'openrouter',
+			'xai'
+		]);
 		expect(rows).toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({
@@ -82,6 +89,11 @@ describe('provider cost helpers', () => {
 				expect.objectContaining({
 					provider_code: 'xai',
 					display_name: 'xAI API',
+					budget_status: 'unknown'
+				}),
+				expect.objectContaining({
+					provider_code: 'openrouter',
+					display_name: 'OpenRouter API',
 					budget_status: 'unknown'
 				})
 			])
@@ -243,6 +255,35 @@ describe('provider cost helpers', () => {
 		expect(linesByConnection[connection.id]).toEqual([
 			expect.objectContaining({
 				amount: 4.25,
+				currency: 'USD'
+			})
+		]);
+	});
+
+	test('refresh supports an injected OpenRouter fixture', async () => {
+		await ensureConfiguredProviderConnections(client, userId, [providerDefinition('openrouter')]);
+		const [connection] = await listProviderConnections(client);
+
+		await refreshProviderCost(client, userId, connection.id, {
+			now: new Date('2026-05-22T10:00:00.000Z'),
+			fetchMonthToDateCost: async ({ adminKey }) => {
+				expect(adminKey).toBe('sk-or-v1-provider-costs');
+				return fixtureCost(2.75, 'openrouter');
+			},
+			resolveCredential: () => 'sk-or-v1-provider-costs'
+		});
+
+		const [updated] = await listProviderConnections(client);
+		expect(updated).toMatchObject({
+			provider_code: 'openrouter',
+			current_period_spend: 2.75,
+			current_period_currency: 'USD'
+		});
+
+		const linesByConnection = await listLatestProviderCostLines(client, [connection.id]);
+		expect(linesByConnection[connection.id]).toEqual([
+			expect.objectContaining({
+				amount: 2.75,
 				currency: 'USD'
 			})
 		]);

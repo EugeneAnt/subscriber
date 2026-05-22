@@ -33,20 +33,23 @@ describe('provider cost helpers', () => {
 		expect(credentialNameForProvider('openai')).toBe('OPENAI_ADMIN_KEY');
 		expect(credentialNameForProvider('anthropic')).toBe('ANTHROPIC_ADMIN_KEY');
 		expect(credentialNameForProvider('xai')).toBe('XAI_MANAGEMENT_KEY');
+		expect(credentialNameForProvider('openrouter')).toBe('OPENROUTER_MANAGEMENT_KEY');
 		expect(
 			configuredProviderDefinitions({
 				OPENAI_ADMIN_KEY: ' sk-admin-test ',
 				ANTHROPIC_ADMIN_KEY: '',
-				XAI_MANAGEMENT_KEY: ''
+				XAI_MANAGEMENT_KEY: '',
+				OPENROUTER_MANAGEMENT_KEY: ''
 			}).map((provider) => provider.code)
 		).toEqual(['openai']);
 		expect(
 			configuredProviderDefinitions({
 				OPENAI_ADMIN_KEY: '',
 				ANTHROPIC_ADMIN_KEY: ' sk-ant-admin-test ',
-				XAI_MANAGEMENT_KEY: ' xai-management-test '
+				XAI_MANAGEMENT_KEY: ' xai-management-test ',
+				OPENROUTER_MANAGEMENT_KEY: ' sk-or-v1-management-test '
 			}).map((provider) => provider.code)
-		).toEqual(['anthropic', 'xai']);
+		).toEqual(['anthropic', 'xai', 'openrouter']);
 		expect(
 			resolveServerEnvCredential('anthropic', 'ANTHROPIC_ADMIN_KEY', {
 				ANTHROPIC_ADMIN_KEY: ' sk-ant-admin-test '
@@ -57,6 +60,11 @@ describe('provider cost helpers', () => {
 				XAI_MANAGEMENT_KEY: ' xai-management-test '
 			})
 		).toBe('xai-management-test');
+		expect(
+			resolveServerEnvCredential('openrouter', 'OPENROUTER_MANAGEMENT_KEY', {
+				OPENROUTER_MANAGEMENT_KEY: ' sk-or-v1-management-test '
+			})
+		).toBe('sk-or-v1-management-test');
 		expect(
 			resolveServerEnvCredential('anthropic', 'OPENAI_ADMIN_KEY', {
 				OPENAI_ADMIN_KEY: 'sk-admin-test'
