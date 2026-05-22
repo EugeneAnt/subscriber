@@ -1,6 +1,6 @@
 -- supabase/tests/provider_costs.test.sql
 begin;
-select plan(24);
+select plan(21);
 
 insert into auth.users (id, email)
   values
@@ -99,9 +99,25 @@ select is(
   'view computes warning status'
 );
 
-update public.provider_cost_snapshots
-  set total_amount = 24.50
-  where id = '31000000-0000-0000-0000-000000000001';
+insert into public.provider_cost_snapshots (
+  id,
+  user_id,
+  provider_connection_id,
+  period_start,
+  period_end_exclusive,
+  total_amount,
+  currency,
+  fetched_at
+) values (
+  '31000000-0000-0000-0000-000000000010',
+  '00000000-0000-0000-0000-000000000301',
+  '30000000-0000-0000-0000-000000000001',
+  current_date - 10,
+  current_date + 1,
+  24.50,
+  'USD',
+  now() + interval '1 second'
+);
 
 select is(
   (select budget_status from public.provider_connections_v where id = '30000000-0000-0000-0000-000000000001'),
@@ -109,9 +125,25 @@ select is(
   'view computes critical status'
 );
 
-update public.provider_cost_snapshots
-  set total_amount = 26
-  where id = '31000000-0000-0000-0000-000000000001';
+insert into public.provider_cost_snapshots (
+  id,
+  user_id,
+  provider_connection_id,
+  period_start,
+  period_end_exclusive,
+  total_amount,
+  currency,
+  fetched_at
+) values (
+  '31000000-0000-0000-0000-000000000011',
+  '00000000-0000-0000-0000-000000000301',
+  '30000000-0000-0000-0000-000000000001',
+  current_date - 10,
+  current_date + 1,
+  26,
+  'USD',
+  now() + interval '2 seconds'
+);
 
 select is(
   (select budget_status from public.provider_connections_v where id = '30000000-0000-0000-0000-000000000001'),
@@ -119,9 +151,25 @@ select is(
   'view computes over budget status'
 );
 
-update public.provider_cost_snapshots
-  set total_amount = 10
-  where id = '31000000-0000-0000-0000-000000000001';
+insert into public.provider_cost_snapshots (
+  id,
+  user_id,
+  provider_connection_id,
+  period_start,
+  period_end_exclusive,
+  total_amount,
+  currency,
+  fetched_at
+) values (
+  '31000000-0000-0000-0000-000000000012',
+  '00000000-0000-0000-0000-000000000301',
+  '30000000-0000-0000-0000-000000000001',
+  current_date - 10,
+  current_date + 1,
+  10,
+  'USD',
+  now() + interval '3 seconds'
+);
 
 select is(
   (select budget_status from public.provider_connections_v where id = '30000000-0000-0000-0000-000000000001'),
@@ -225,9 +273,10 @@ select throws_ok(
 set local role anon;
 set local "request.jwt.claims" = '{"role":"anon"}';
 
-select is(
-  (select count(*) from public.provider_catalog),
-  0::bigint,
+select throws_ok(
+  $$ select count(*) from public.provider_catalog $$,
+  '42501',
+  null,
   'anon cannot read provider catalog'
 );
 
@@ -279,10 +328,13 @@ select throws_ok(
 
 select throws_ok(
   $$ update public.provider_connections_v set display_name = 'mutated' $$,
-  '42501',
+  '55000',
   null,
   'provider view is read-only to app roles'
 );
+
+set local "request.jwt.claims" = '{"sub":"00000000-0000-0000-0000-000000000301","role":"authenticated"}';
+set local role authenticated;
 
 select throws_ok(
   $$ insert into public.provider_connections (
