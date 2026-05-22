@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import {
 	defaultOpenAiConnection,
 	ensureOpenAiConnection,
+	listLatestProviderCostLines,
 	listProviderConnections,
 	refreshOpenAiCost,
 	updateProviderBudget
@@ -112,6 +113,16 @@ describe('provider cost helpers', () => {
 		const [updated] = await listProviderConnections(client);
 		expect(updated.current_period_spend).toBe(12.5);
 		expect(updated.current_period_currency).toBe('USD');
+
+		const linesByConnection = await listLatestProviderCostLines(client, [connection.id]);
+		expect(linesByConnection[connection.id]).toEqual([
+			expect.objectContaining({
+				external_project_id: 'proj_test',
+				line_item: 'text',
+				amount: 12.5,
+				currency: 'USD'
+			})
+		]);
 	});
 
 	test('refresh persists a sanitized snapshot and deduplicates repeated identical results', async () => {

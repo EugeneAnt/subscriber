@@ -15,6 +15,8 @@ type ProviderCostSnapshotInsert =
 	Database['public']['Tables']['provider_cost_snapshots']['Insert'];
 type ProviderCostSnapshotLineInsert =
 	Database['public']['Tables']['provider_cost_snapshot_lines']['Insert'];
+type ProviderCostSnapshotLineRow =
+	Database['public']['Tables']['provider_cost_snapshot_lines']['Row'];
 type ProviderConnectionViewRow = Database['public']['Views']['provider_connections_v']['Row'];
 type ProviderConnectionViewInput = Omit<
 	Partial<ProviderConnectionViewRow>,
@@ -201,6 +203,50 @@ export async function listProviderConnections(supabase: Client): Promise<Provide
 		const card = toProviderConnectionCard(row);
 		return card ? [card] : [];
 	});
+}
+
+export async function listLatestProviderCostLines(
+	supabase: Client,
+	connectionIds: string[]
+): Promise<Record<string, ProviderCostSnapshotLineRow[]>> {
+	if (connectionIds.length === 0) {
+		return {};
+	}
+
+	const output: Record<string, ProviderCostSnapshotLineRow[]> = {};
+
+	// Phase 3 has one OpenAI connection. Batch this if multi-provider usage makes it hot.
+	for (const connectionId of connectionIds) {
+		const { data: snapshot, error: snapshotError } = await supabase
+			.from('provider_cost_snapshots')
+			.select('id, provider_connection_id')
+			.eq('provider_connection_id', connectionId)
+			.order('fetched_at', { ascending: false })
+			.limit(1)
+			.maybeSingle();
+
+		if (snapshotError) {
+			throw snapshotError;
+		}
+
+		if (!snapshot) {
+			continue;
+		}
+
+		const { data: lines, error: linesError } = await supabase
+			.from('provider_cost_snapshot_lines')
+			.select('*')
+			.eq('snapshot_id', snapshot.id)
+			.order('amount', { ascending: false });
+
+		if (linesError) {
+			throw linesError;
+		}
+
+		output[connectionId] = lines ?? [];
+	}
+
+	return output;
 }
 
 function snapshotInsert(

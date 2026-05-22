@@ -15,6 +15,7 @@ import {
 	ensureOpenAiConnection,
 	isOpenAiCostSyncConfigured,
 	isSnapshotFresh,
+	listLatestProviderCostLines,
 	listProviderConnections,
 	normalizeBudgetInput,
 	refreshOpenAiCost,
@@ -97,6 +98,7 @@ export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	const { activeCount, upcoming30Count } = getDashboardSummary(allItems, events, today);
 
 	let providerConnections: Awaited<ReturnType<typeof listProviderConnections>> = [];
+	let providerLinesByConnection: Awaited<ReturnType<typeof listLatestProviderCostLines>> = {};
 	let providerConfigured = false;
 
 	if (tab === 'payg') {
@@ -119,6 +121,10 @@ export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 			}
 
 			providerConnections = await listProviderConnections(locals.supabase);
+			providerLinesByConnection = await listLatestProviderCostLines(
+				locals.supabase,
+				providerConnections.map((connection) => connection.id)
+			);
 		}
 	}
 
@@ -137,7 +143,7 @@ export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 		reminderCount,
 		providerConnections,
 		providerConfigured,
-		providerLinesByConnection: {},
+		providerLinesByConnection,
 		flash
 	};
 };
