@@ -53,6 +53,10 @@ type OpenAiCostFetcher = (input: {
 	projectIds?: string[];
 	now: Date;
 }) => Promise<ProviderCostFetchResult>;
+type ServerEnvCredentialResolver = (
+	providerCode: 'openai',
+	credentialName: string
+) => string | null;
 
 function parseNumeric(value: unknown): number | null {
 	if (typeof value === 'number') {
@@ -278,7 +282,8 @@ export async function refreshOpenAiCost(
 	userId: string,
 	connectionId: string,
 	now = new Date(),
-	fetchMonthToDateCost: OpenAiCostFetcher = openaiProvider.fetchMonthToDateCost
+	fetchMonthToDateCost: OpenAiCostFetcher = openaiProvider.fetchMonthToDateCost,
+	resolveCredential: ServerEnvCredentialResolver = resolveServerEnvCredential
 ): Promise<void> {
 	const startedAt = now.toISOString();
 	await updateConnectionSyncStatus(supabase, connectionId, {
@@ -296,7 +301,7 @@ export async function refreshOpenAiCost(
 
 		if (error) throw error;
 
-		const adminKey = resolveServerEnvCredential('openai', connection.credential_name ?? '');
+		const adminKey = resolveCredential('openai', connection.credential_name ?? '');
 		if (!adminKey) {
 			throw new ProviderSyncError('not_configured', 'OPENAI_ADMIN_KEY is not configured.');
 		}
