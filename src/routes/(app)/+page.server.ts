@@ -43,6 +43,7 @@ function safeReferrerPath(request: Request, currentUrl: URL): string {
 export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	const filters = parseDashboardFilters(url.searchParams);
 	const flash = consumeFlash(cookies);
+	const today = todayIso();
 	const filteredItemsPromise = hasDashboardFilters(filters)
 		? listItemsForTable(locals.supabase, filters)
 		: null;
@@ -62,11 +63,12 @@ export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	const events = toDashboardEvents(eventRows);
 	const burn = toDashboardBurn(burnRows);
 	const { categories, providers } = getDistinctOptions(allItems);
-	const { activeCount, upcoming30Count } = getDashboardSummary(allItems, events, todayIso());
+	const { activeCount, upcoming30Count } = getDashboardSummary(allItems, events, today);
 
 	return {
 		items,
 		events,
+		today,
 		burn,
 		activeCount,
 		upcoming30Count,

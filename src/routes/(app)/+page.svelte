@@ -51,7 +51,7 @@
 	{:else}
 		<DueReminders reminders={data.reminders} totalCount={data.reminderCount} />
 
-		<UpcomingList events={data.events} />
+		<UpcomingList events={data.events} today={data.today} />
 
 		<section class="space-y-3" aria-labelledby="items-heading">
 			<div class="flex items-center justify-between gap-3">

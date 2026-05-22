@@ -1,15 +1,17 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { Badge } from '$lib/components/ui/badge';
+	import { formatEventTimingLabel } from '$lib/date-labels';
 	import type { DashboardEvent } from '$lib/types/dashboard';
 
 	import EmptyState from './EmptyState.svelte';
 
 	type Props = {
 		events: DashboardEvent[];
+		today: string;
 	};
 
-	let { events }: Props = $props();
+	let { events, today }: Props = $props();
 
 	function formatDate(date: string): string {
 		return new Intl.DateTimeFormat(undefined, {
@@ -45,7 +47,13 @@
 						>
 							{event.name}
 						</a>
-						<p class="text-sm text-muted-foreground">{formatDate(event.event_date)}</p>
+						<p class="text-sm text-muted-foreground">
+							{formatDate(event.event_date)} · {formatEventTimingLabel(
+								event.event_kind,
+								event.event_date,
+								today
+							)}
+						</p>
 					</div>
 
 					<div class="flex shrink-0 items-center gap-2">
