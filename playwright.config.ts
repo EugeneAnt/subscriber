@@ -19,10 +19,18 @@ for (const file of ['.env', '.env.test']) {
 	}
 }
 
+if (env.E2E_OPENAI_ADMIN_KEY) {
+	env.OPENAI_ADMIN_KEY = env.E2E_OPENAI_ADMIN_KEY;
+} else {
+	// E2E covers the safe default state and must not call the live OpenAI API by accident.
+	// Keep the key present-but-empty so Vite/SvelteKit do not reload it from .env during preview.
+	env.OPENAI_ADMIN_KEY = '';
+}
+
 Object.assign(process.env, env);
 
-const port = process.env.E2E_PORT ?? '5173';
-const baseURL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${port}`;
+const port = env.E2E_PORT ?? '5173';
+const baseURL = env.E2E_BASE_URL ?? `http://127.0.0.1:${port}`;
 
 export default defineConfig({
 	testDir: 'tests/e2e',
@@ -42,7 +50,7 @@ export default defineConfig({
 	webServer: {
 		command: `npm run build && npm run preview -- --host 127.0.0.1 --port ${port}`,
 		url: baseURL,
-		reuseExistingServer: !process.env.CI,
+		reuseExistingServer: env.E2E_REUSE_SERVER === 'true',
 		timeout: 120_000,
 		env: {
 			...env,

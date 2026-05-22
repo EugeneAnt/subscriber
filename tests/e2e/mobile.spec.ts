@@ -54,3 +54,23 @@ test('reminders page uses mobile-friendly action targets', async ({ page, testUs
 		expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
 	}
 });
+
+test('pay-as-you-go controls are touch friendly on mobile', async ({ page, testUser }, testInfo) => {
+	test.skip(testInfo.project.name !== 'webkit-mobile', 'Mobile-only coverage.');
+
+	await signIn(page, testUser);
+	await page.getByRole('link', { name: 'Pay-as-you-go' }).click();
+
+	const paygLink = page.getByRole('link', { name: 'Pay-as-you-go' });
+	await expect(paygLink).toBeVisible();
+	const linkBox = await paygLink.boundingBox();
+	expect(linkBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+	expect(linkBox?.width ?? 0).toBeGreaterThanOrEqual(44);
+
+	const refresh = page.getByRole('button', { name: 'Refresh' });
+	if (await refresh.isVisible()) {
+		const box = await refresh.boundingBox();
+		expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+		expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+	}
+});

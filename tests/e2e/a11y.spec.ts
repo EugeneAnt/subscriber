@@ -25,6 +25,13 @@ test('reminders page has no critical a11y violations', async ({ page, testUser }
 	await expectNoCriticalA11yViolations(page);
 });
 
+test('pay-as-you-go page has no critical a11y violations', async ({ page, testUser }) => {
+	await signIn(page, testUser);
+	await page.goto('/?tab=payg');
+	await expect(page.getByRole('heading', { name: 'Pay-as-you-go' })).toBeVisible();
+	await expectNoCriticalA11yViolations(page);
+});
+
 test('new-item page has no critical a11y violations', async ({ page, testUser }) => {
 	await signIn(page, testUser);
 	await page.goto('/items/new');
