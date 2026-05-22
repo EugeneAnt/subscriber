@@ -55,7 +55,10 @@ test('reminders page uses mobile-friendly action targets', async ({ page, testUs
 	}
 });
 
-test('pay-as-you-go controls are touch friendly on mobile', async ({ page, testUser }, testInfo) => {
+test('pay-as-you-go controls are touch friendly on mobile', async ({
+	page,
+	testUser
+}, testInfo) => {
 	test.skip(testInfo.project.name !== 'webkit-mobile', 'Mobile-only coverage.');
 
 	await signIn(page, testUser);

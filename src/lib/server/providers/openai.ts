@@ -44,7 +44,9 @@ function unixSeconds(date: Date): number {
 
 export function utcMonthWindow(now: Date): MonthWindow {
 	const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-	const tomorrow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+	const tomorrow = new Date(
+		Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)
+	);
 
 	return {
 		periodStart: isoDate(monthStart),
@@ -54,7 +56,11 @@ export function utcMonthWindow(now: Date): MonthWindow {
 	};
 }
 
-function buildCostsUrl(window: MonthWindow, projectIds: string[] | undefined, page: string | null): URL {
+function buildCostsUrl(
+	window: MonthWindow,
+	projectIds: string[] | undefined,
+	page: string | null
+): URL {
 	const url = new URL(costsUrl);
 	url.searchParams.set('start_time', String(window.startTime));
 	url.searchParams.set('end_time', String(window.endTime));
@@ -202,13 +208,19 @@ export async function fetchOpenAIMonthToDateCost(input: {
 		pageCursor = page.next_page;
 
 		if (pageIndex === maxPages - 1) {
-			throw new ProviderSyncError('bad_response', 'OpenAI Costs API pagination exceeded safety limit.');
+			throw new ProviderSyncError(
+				'bad_response',
+				'OpenAI Costs API pagination exceeded safety limit.'
+			);
 		}
 	}
 
 	const currencies = new Set(lines.map((line) => line.currency));
 	if (currencies.size > 1) {
-		throw new ProviderSyncError('unsupported_currency', 'OpenAI Costs API returned multiple currencies.');
+		throw new ProviderSyncError(
+			'unsupported_currency',
+			'OpenAI Costs API returned multiple currencies.'
+		);
 	}
 
 	const currency = lines[0]?.currency ?? 'USD';

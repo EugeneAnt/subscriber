@@ -46,7 +46,10 @@
 	<DashboardTabs active={data.tab} />
 
 	{#if form?.error}
-		<p class="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+		<p
+			class="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+			role="alert"
+		>
 			{form.error}
 		</p>
 	{/if}
@@ -57,37 +60,35 @@
 			linesByConnection={data.providerLinesByConnection}
 			configured={data.providerConfigured}
 		/>
+	{:else if data.items.length === 0 && Object.keys(data.filters).length === 0}
+		<EmptyState
+			title="No items yet"
+			body="Track your first subscription, renewal, warranty, or license."
+			actionHref="/items/new"
+			actionLabel="Add your first item"
+		/>
 	{:else}
-		{#if data.items.length === 0 && Object.keys(data.filters).length === 0}
-			<EmptyState
-				title="No items yet"
-				body="Track your first subscription, renewal, warranty, or license."
-				actionHref="/items/new"
-				actionLabel="Add your first item"
-			/>
-		{:else}
-			<DueReminders reminders={data.reminders} totalCount={data.reminderCount} />
+		<DueReminders reminders={data.reminders} totalCount={data.reminderCount} />
 
-			<UpcomingList events={data.events} today={data.today} />
+		<UpcomingList events={data.events} today={data.today} />
 
-			<section class="space-y-3" aria-labelledby="items-heading">
-				<div class="flex items-center justify-between gap-3">
-					<h2 id="items-heading" class="text-lg font-semibold">All items</h2>
-					<p class="text-sm text-muted-foreground tabular-nums">{data.items.length} shown</p>
-				</div>
+		<section class="space-y-3" aria-labelledby="items-heading">
+			<div class="flex items-center justify-between gap-3">
+				<h2 id="items-heading" class="text-lg font-semibold">All items</h2>
+				<p class="text-sm text-muted-foreground tabular-nums">{data.items.length} shown</p>
+			</div>
 
-				<Filters filters={data.filters} categories={data.categories} providers={data.providers} />
+			<Filters filters={data.filters} categories={data.categories} providers={data.providers} />
 
-				{#if data.items.length === 0}
-					<EmptyState
-						title="No items match these filters"
-						body="Reset filters or adjust the selection."
-					/>
-				{:else}
-					<ItemTable rows={data.items} />
-					<ItemCardList rows={data.items} />
-				{/if}
-			</section>
-		{/if}
+			{#if data.items.length === 0}
+				<EmptyState
+					title="No items match these filters"
+					body="Reset filters or adjust the selection."
+				/>
+			{:else}
+				<ItemTable rows={data.items} />
+				<ItemCardList rows={data.items} />
+			{/if}
+		</section>
 	{/if}
 </div>

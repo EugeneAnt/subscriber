@@ -11,8 +11,7 @@ import type { ProviderCostFetchResult } from './providers/types';
 type Client = Pick<SupabaseClient<Database>, 'from'>;
 type ProviderConnectionInsert = Database['public']['Tables']['provider_connections']['Insert'];
 type ProviderConnectionUpdate = Database['public']['Tables']['provider_connections']['Update'];
-type ProviderCostSnapshotInsert =
-	Database['public']['Tables']['provider_cost_snapshots']['Insert'];
+type ProviderCostSnapshotInsert = Database['public']['Tables']['provider_cost_snapshots']['Insert'];
 type ProviderCostSnapshotLineInsert =
 	Database['public']['Tables']['provider_cost_snapshot_lines']['Insert'];
 type ProviderCostSnapshotLineRow =
@@ -263,7 +262,8 @@ function snapshotInsert(
 		total_amount: result.totalAmount,
 		currency: result.currency,
 		provider_observed_at: result.providerObservedAt ?? null,
-		raw_summary: result.rawSummary as Database['public']['Tables']['provider_cost_snapshots']['Insert']['raw_summary']
+		raw_summary:
+			result.rawSummary as Database['public']['Tables']['provider_cost_snapshots']['Insert']['raw_summary']
 	};
 }
 
@@ -282,7 +282,8 @@ function lineInserts(
 		amount: line.amount,
 		currency: line.currency,
 		quantity: line.quantity ?? null,
-		raw_line: line.raw as Database['public']['Tables']['provider_cost_snapshot_lines']['Insert']['raw_line']
+		raw_line:
+			line.raw as Database['public']['Tables']['provider_cost_snapshot_lines']['Insert']['raw_line']
 	}));
 }
 
@@ -316,7 +317,10 @@ async function updateConnectionSyncStatus(
 	connectionId: string,
 	patch: ProviderConnectionUpdate
 ): Promise<void> {
-	const { error } = await supabase.from('provider_connections').update(patch).eq('id', connectionId);
+	const { error } = await supabase
+		.from('provider_connections')
+		.update(patch)
+		.eq('id', connectionId);
 
 	if (error) {
 		throw error;
@@ -396,7 +400,10 @@ export async function updateProviderBudget(
 	connectionId: string,
 	patch: ProviderBudgetPatch
 ): Promise<void> {
-	const { error } = await supabase.from('provider_connections').update(patch).eq('id', connectionId);
+	const { error } = await supabase
+		.from('provider_connections')
+		.update(patch)
+		.eq('id', connectionId);
 
 	if (error) {
 		throw error;
