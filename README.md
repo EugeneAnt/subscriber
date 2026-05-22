@@ -55,6 +55,13 @@ PROVIDER_COST_CACHE_MINUTES=60
 
 Provider admin keys are optional. The app starts without them and shows a configuration state on the Pay-as-you-go tab. Keys are read only by SvelteKit server code and are never sent to the browser or stored in Supabase.
 
+Supported pay-as-you-go providers:
+
+| Provider | Environment variable | What is synced | Notes |
+| --- | --- | --- | --- |
+| OpenAI | `OPENAI_ADMIN_KEY` | Current UTC-month organization spend from the OpenAI Costs API | Supports provider-side project filtering internally; the UI does not expose project filters yet. Remaining budget is local app math, not an OpenAI credit-balance value. |
+| Anthropic | `ANTHROPIC_ADMIN_KEY` | Current UTC-month organization spend from the Anthropic Cost Report API | Requires an organization Admin API key. Individual Anthropic accounts and Claude Platform on AWS do not expose the required cost endpoint. |
+
 Pay-as-you-go cards render cached database snapshots immediately. If a card is stale, the browser refreshes that provider in the background after the page opens; the refresh button still forces a manual update. `PROVIDER_COST_CACHE_MINUTES` controls both successful snapshot freshness and retry backoff after a failed sync attempt.
 
 OpenAI cost sync reads organization spend from the OpenAI Costs API. OpenAI does not currently expose a documented remaining-credit balance through the Admin API, so Subscriber treats the budget fields as local tracking thresholds and calculates remaining budget from the synced current-month spend.
