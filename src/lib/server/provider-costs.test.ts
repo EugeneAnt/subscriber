@@ -6,6 +6,23 @@ import {
 	normalizeBudgetInput,
 	toProviderConnectionCard
 } from './provider-costs';
+import type { Database } from '$lib/types/database';
+
+type ProviderConnectionViewRow = Database['public']['Views']['provider_connections_v']['Row'];
+type RuntimeProviderConnectionViewRow = Omit<
+	ProviderConnectionViewRow,
+	| 'monthly_budget'
+	| 'warning_remaining_amount'
+	| 'critical_remaining_amount'
+	| 'current_period_spend'
+	| 'remaining_budget'
+> & {
+	monthly_budget: string;
+	warning_remaining_amount: string;
+	critical_remaining_amount: string;
+	current_period_spend: string;
+	remaining_budget: string;
+};
 
 describe('provider cost helpers', () => {
 	test('parses cache minutes with a safe default', () => {
@@ -76,7 +93,7 @@ describe('provider cost helpers', () => {
 				budget_status: 'healthy',
 				latest_fetched_at: '2026-05-22T10:00:00.000Z',
 				last_sync_status: 'success'
-			})
+			} satisfies Partial<RuntimeProviderConnectionViewRow>)
 		).toEqual(
 			expect.objectContaining({
 				id: 'connection-1',
