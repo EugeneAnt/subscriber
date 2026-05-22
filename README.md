@@ -8,9 +8,10 @@ It uses Supabase for Auth, Postgres, PostgREST, and Row Level Security. The app 
 
 - Email and password sign-in with Supabase Auth
 - Unified tracked items for subscriptions, expiry-only items, and hybrid items
-- Dashboard summary tiles, upcoming events, filters, desktop table, and mobile card list
+- Dashboard summary tiles for active items, upcoming events, subscription burn, and pay-as-you-go spend
+- Upcoming events, filters, desktop table, and mobile card list
 - In-app payment reminders 7 days and 1 day before upcoming billing dates
-- Optional OpenAI API pay-as-you-go cost sync with monthly budget status
+- Optional OpenAI API pay-as-you-go cost sync with current-month spend and local budget status
 - Calendar-aware billing rollover in Postgres
 - Per-currency monthly and annualized burn views
 - Server-side validation with Valibot and sveltekit-superforms
@@ -52,6 +53,8 @@ PROVIDER_COST_CACHE_MINUTES=60
 `SUPABASE_ANON_KEY` is still accepted as a legacy fallback for local or self-hosted Supabase setups. `SUPABASE_SERVICE_ROLE_KEY` is intentionally not used by the application runtime. Keep service-role or secret keys for local admin scripts and tests only.
 
 `OPENAI_ADMIN_KEY` is optional. The app starts without it and shows a configuration state on the Pay-as-you-go tab. The key is read only by SvelteKit server code and is never sent to the browser or stored in Supabase.
+
+OpenAI cost sync reads organization spend from the OpenAI Costs API. OpenAI does not currently expose a documented remaining-credit balance through the Admin API, so Subscriber treats the budget fields as local tracking thresholds and calculates remaining budget from the synced current-month spend.
 
 For local development, copy `.env.example`:
 
