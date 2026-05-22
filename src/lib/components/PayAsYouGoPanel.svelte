@@ -11,9 +11,17 @@
 		connections: ProviderConnectionCard[];
 		linesByConnection: Record<string, Line[]>;
 		configured: boolean;
+		loading?: boolean;
+		error?: string | null;
 	};
 
-	let { connections, linesByConnection, configured }: Props = $props();
+	let {
+		connections,
+		linesByConnection,
+		configured,
+		loading = false,
+		error = null
+	}: Props = $props();
 </script>
 
 <section class="space-y-4" aria-labelledby="payg-heading">
@@ -24,13 +32,32 @@
 		</p>
 	</div>
 
-	{#if !configured}
+	{#if loading}
+		<div class="rounded-lg border bg-card p-4 text-card-foreground" role="status">
+			<div class="flex items-center gap-3">
+				<div
+					class="size-5 animate-spin rounded-full border-2 border-muted border-t-foreground"
+				></div>
+				<p class="text-sm text-muted-foreground">Loading provider costs...</p>
+			</div>
+		</div>
+	{:else if error}
+		<div
+			class="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-destructive"
+			role="alert"
+		>
+			<p class="text-sm">{error}</p>
+		</div>
+	{:else if !configured}
 		<EmptyState
-			title="OpenAI cost sync is not configured"
-			body="Set OPENAI_ADMIN_KEY in the server environment to enable OpenAI API cost sync."
+			title="Provider cost sync is not configured"
+			body="Set OPENAI_ADMIN_KEY or ANTHROPIC_ADMIN_KEY in the server environment to enable pay-as-you-go cost cards."
 		/>
 	{:else if connections.length === 0}
-		<EmptyState title="No provider connections" body="OpenAI API cost sync will appear here." />
+		<EmptyState
+			title="No provider connections"
+			body="Configured provider cost sync will appear here."
+		/>
 	{:else}
 		<div class="space-y-4">
 			{#each connections as connection (connection.id)}

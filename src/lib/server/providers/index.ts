@@ -1,24 +1,50 @@
 import { env as privateEnv } from '$env/dynamic/private';
 
-import type { ProviderCode } from './types';
+import { anthropicProvider } from './anthropic';
+import { openaiProvider } from './openai';
+import type { ProviderCode, ProviderDefinition } from './types';
 
-const serverEnvCredentials: Record<ProviderCode, string> = {
-	openai: 'OPENAI_ADMIN_KEY'
-};
+type EnvLike = Record<string, string | undefined>;
+
+export const providerDefinitions = {
+	openai: openaiProvider,
+	anthropic: anthropicProvider
+} satisfies Record<ProviderCode, ProviderDefinition>;
+
+export function providerCodes(): ProviderCode[] {
+	return Object.keys(providerDefinitions) as ProviderCode[];
+}
+
+export function isProviderCode(value: string): value is ProviderCode {
+	return value in providerDefinitions;
+}
+
+export function providerDefinition(provider: ProviderCode): ProviderDefinition {
+	return providerDefinitions[provider];
+}
 
 export function credentialNameForProvider(provider: ProviderCode): string {
-	return serverEnvCredentials[provider];
+	return providerDefinition(provider).credentialName;
 }
 
 export function resolveServerEnvCredential(
 	provider: ProviderCode,
-	credentialName: string
+	credentialName: string,
+	env: EnvLike = privateEnv
 ): string | null {
 	const expectedName = credentialNameForProvider(provider);
 	if (credentialName !== expectedName) {
 		return null;
 	}
 
-	const value = privateEnv[expectedName]?.trim();
+	const value = env[expectedName]?.trim();
 	return value ? value : null;
+}
+
+export function configuredProviderDefinitions(env: EnvLike = privateEnv): ProviderDefinition[] {
+	return providerCodes().flatMap((provider) => {
+		const definition = providerDefinition(provider);
+		const value = env[definition.credentialName]?.trim();
+		return value ? [definition] : [];
+	});
 }

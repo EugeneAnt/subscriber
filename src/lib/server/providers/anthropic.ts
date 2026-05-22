@@ -1,34 +1,37 @@
 import { ProviderSyncError } from './errors';
 import type { ProviderCostFetchResult, ProviderCostLine, ProviderDefinition } from './types';
 
-const costsUrl = 'https://api.openai.com/v1/organization/costs';
+const costReportUrl = 'https://api.anthropic.com/v1/organizations/cost_report';
 const supportedCurrencies = new Set(['USD']);
 const maxPages = 20;
 
 type MonthWindow = {
 	periodStart: string;
 	periodEndExclusive: string;
-	startTime: number;
-	endTime: number;
+	startingAt: string;
+	endingAt: string;
 };
 
-type OpenAICostResult = {
-	amount?: {
-		value?: unknown;
-		currency?: unknown;
-	};
-	line_item?: unknown;
-	project_id?: unknown;
-	api_key_id?: unknown;
+type AnthropicCostResult = {
+	amount?: unknown;
+	currency?: unknown;
+	workspace_id?: unknown;
+	description?: unknown;
+	cost_type?: unknown;
+	model?: unknown;
+	service_tier?: unknown;
+	token_type?: unknown;
+	context_window?: unknown;
+	inference_geo?: unknown;
 };
 
-type OpenAICostBucket = {
-	start_time?: unknown;
-	end_time?: unknown;
+type AnthropicCostBucket = {
+	starting_at?: unknown;
+	ending_at?: unknown;
 	results?: unknown;
 };
 
-type OpenAICostPage = {
+type AnthropicCostPage = {
 	has_more?: unknown;
 	next_page?: unknown;
 	data?: unknown;
@@ -36,10 +39,6 @@ type OpenAICostPage = {
 
 function isoDate(date: Date): string {
 	return date.toISOString().slice(0, 10);
-}
-
-function unixSeconds(date: Date): number {
-	return Math.floor(date.getTime() / 1000);
 }
 
 export function utcMonthWindow(now: Date): MonthWindow {
@@ -51,27 +50,19 @@ export function utcMonthWindow(now: Date): MonthWindow {
 	return {
 		periodStart: isoDate(monthStart),
 		periodEndExclusive: isoDate(tomorrow),
-		startTime: unixSeconds(monthStart),
-		endTime: unixSeconds(tomorrow)
+		startingAt: monthStart.toISOString(),
+		endingAt: tomorrow.toISOString()
 	};
 }
 
-function buildCostsUrl(
-	window: MonthWindow,
-	projectIds: string[] | undefined,
-	page: string | null
-): URL {
-	const url = new URL(costsUrl);
-	url.searchParams.set('start_time', String(window.startTime));
-	url.searchParams.set('end_time', String(window.endTime));
+function buildCostReportUrl(window: MonthWindow, page: string | null): URL {
+	const url = new URL(costReportUrl);
+	url.searchParams.set('starting_at', window.startingAt);
+	url.searchParams.set('ending_at', window.endingAt);
 	url.searchParams.set('bucket_width', '1d');
-	url.searchParams.set('limit', '180');
-	url.searchParams.append('group_by', 'project_id');
-	url.searchParams.append('group_by', 'line_item');
-
-	for (const projectId of projectIds ?? []) {
-		url.searchParams.append('project_ids', projectId);
-	}
+	url.searchParams.set('limit', '31');
+	url.searchParams.append('group_by[]', 'workspace_id');
+	url.searchParams.append('group_by[]', 'description');
 
 	if (page) {
 		url.searchParams.set('page', page);
@@ -84,7 +75,7 @@ function redact(value: string): string {
 	return value.replace(/sk-[A-Za-z0-9_-]+/g, '[redacted]');
 }
 
-async function readPage(response: Response): Promise<OpenAICostPage> {
+async function readPage(response: Response): Promise<AnthropicCostPage> {
 	const text = await response.text();
 
 	if (!response.ok) {
@@ -98,23 +89,25 @@ async function readPage(response: Response): Promise<OpenAICostPage> {
 						: 'bad_response';
 		throw new ProviderSyncError(
 			kind,
-			redact(`OpenAI Costs API failed with HTTP ${response.status}: ${text}`),
+			redact(`Anthropic Cost Report API failed with HTTP ${response.status}: ${text}`),
+			{ status: response.status }
+		);
+	}
+
+	try {
+		return (text ? JSON.parse(text) : {}) as AnthropicCostPage;
+	} catch {
+		throw new ProviderSyncError(
+			'bad_response',
+			'Anthropic Cost Report API returned invalid JSON.',
 			{
 				status: response.status
 			}
 		);
 	}
-
-	try {
-		return (text ? JSON.parse(text) : {}) as OpenAICostPage;
-	} catch {
-		throw new ProviderSyncError('bad_response', 'OpenAI Costs API returned invalid JSON.', {
-			status: response.status
-		});
-	}
 }
 
-function amountValue(value: unknown): number | null {
+function centsValue(value: unknown): number | null {
 	if (typeof value === 'number') {
 		return Number.isFinite(value) ? value : null;
 	}
@@ -132,46 +125,54 @@ function amountValue(value: unknown): number | null {
 	return Number.isFinite(parsed) ? parsed : null;
 }
 
-function amountFromResult(result: OpenAICostResult): { value: number; currency: string } {
-	const value = result.amount?.value;
-	const currency = result.amount?.currency;
-	const parsedValue = amountValue(value);
+function amountFromResult(result: AnthropicCostResult): { value: number; currency: string } {
+	const value = centsValue(result.amount);
+	const currency = result.currency;
 
-	if (parsedValue === null || typeof currency !== 'string') {
-		throw new ProviderSyncError('bad_response', 'OpenAI Costs API returned a malformed amount.');
+	if (value === null || typeof currency !== 'string') {
+		throw new ProviderSyncError(
+			'bad_response',
+			'Anthropic Cost Report API returned a malformed amount.'
+		);
 	}
 
 	const normalizedCurrency = currency.toUpperCase();
 	if (!supportedCurrencies.has(normalizedCurrency)) {
 		throw new ProviderSyncError(
 			'unsupported_currency',
-			`OpenAI Costs API returned unsupported currency ${normalizedCurrency}.`
+			`Anthropic Cost Report API returned unsupported currency ${normalizedCurrency}.`
 		);
 	}
 
-	return { value: parsedValue, currency: normalizedCurrency };
+	return { value: value / 100, currency: normalizedCurrency };
 }
 
-function sanitizeResult(result: OpenAICostResult): OpenAICostResult {
+function sanitizeResult(result: AnthropicCostResult): AnthropicCostResult {
 	return {
 		amount: result.amount,
-		line_item: result.line_item,
-		project_id: result.project_id,
-		api_key_id: result.api_key_id
+		currency: result.currency,
+		workspace_id: result.workspace_id,
+		description: result.description,
+		cost_type: result.cost_type,
+		model: result.model,
+		service_tier: result.service_tier,
+		token_type: result.token_type,
+		context_window: result.context_window,
+		inference_geo: result.inference_geo
 	};
 }
 
-function linesFromBucket(bucket: OpenAICostBucket): ProviderCostLine[] {
+function linesFromBucket(bucket: AnthropicCostBucket): ProviderCostLine[] {
 	const results = Array.isArray(bucket.results) ? bucket.results : [];
 
 	return results.map((rawResult) => {
-		const result = rawResult as OpenAICostResult;
+		const result = rawResult as AnthropicCostResult;
 		const amount = amountFromResult(result);
 
 		return {
-			externalProjectId: typeof result.project_id === 'string' ? result.project_id : null,
-			externalApiKeyId: typeof result.api_key_id === 'string' ? result.api_key_id : null,
-			lineItem: typeof result.line_item === 'string' ? result.line_item : null,
+			externalProjectId: typeof result.workspace_id === 'string' ? result.workspace_id : null,
+			externalApiKeyId: null,
+			lineItem: typeof result.description === 'string' ? result.description : null,
 			amount: amount.value,
 			currency: amount.currency,
 			raw: sanitizeResult(result)
@@ -179,7 +180,7 @@ function linesFromBucket(bucket: OpenAICostBucket): ProviderCostLine[] {
 	});
 }
 
-function sanitizedSummary(pages: OpenAICostPage[]): unknown {
+function sanitizedSummary(pages: AnthropicCostPage[]): unknown {
 	return {
 		pages: pages.map((page) => ({
 			has_more: page.has_more === true,
@@ -189,7 +190,7 @@ function sanitizedSummary(pages: OpenAICostPage[]): unknown {
 	};
 }
 
-export async function fetchOpenAIMonthToDateCost(input: {
+export async function fetchAnthropicMonthToDateCost(input: {
 	adminKey: string;
 	projectIds?: string[];
 	now: Date;
@@ -197,19 +198,26 @@ export async function fetchOpenAIMonthToDateCost(input: {
 }): Promise<ProviderCostFetchResult> {
 	const fetchImpl = input.fetch ?? fetch;
 	const window = utcMonthWindow(input.now);
-	const pages: OpenAICostPage[] = [];
+	const pages: AnthropicCostPage[] = [];
 	const lines: ProviderCostLine[] = [];
 	let pageCursor: string | null = null;
 
 	for (let pageIndex = 0; pageIndex < maxPages; pageIndex += 1) {
 		let response: Response;
 		try {
-			response = await fetchImpl(buildCostsUrl(window, input.projectIds, pageCursor), {
-				headers: { authorization: `Bearer ${input.adminKey}` }
+			response = await fetchImpl(buildCostReportUrl(window, pageCursor), {
+				headers: {
+					'anthropic-version': '2023-06-01',
+					'user-agent': 'Subscriber/0.1 (https://github.com/EugeneAnt/subscriber)',
+					'x-api-key': input.adminKey
+				}
 			});
 		} catch (error) {
 			const message = error instanceof Error ? redact(error.message) : 'Network request failed.';
-			throw new ProviderSyncError('network', `OpenAI Costs API request failed: ${message}`);
+			throw new ProviderSyncError(
+				'network',
+				`Anthropic Cost Report API request failed: ${message}`
+			);
 		}
 
 		const page = await readPage(response);
@@ -217,7 +225,7 @@ export async function fetchOpenAIMonthToDateCost(input: {
 
 		const buckets = Array.isArray(page.data) ? page.data : [];
 		for (const rawBucket of buckets) {
-			lines.push(...linesFromBucket(rawBucket as OpenAICostBucket));
+			lines.push(...linesFromBucket(rawBucket as AnthropicCostBucket));
 		}
 
 		if (page.has_more !== true || typeof page.next_page !== 'string' || page.next_page === '') {
@@ -229,7 +237,7 @@ export async function fetchOpenAIMonthToDateCost(input: {
 		if (pageIndex === maxPages - 1) {
 			throw new ProviderSyncError(
 				'bad_response',
-				'OpenAI Costs API pagination exceeded safety limit.'
+				'Anthropic Cost Report API pagination exceeded safety limit.'
 			);
 		}
 	}
@@ -238,13 +246,13 @@ export async function fetchOpenAIMonthToDateCost(input: {
 	if (currencies.size > 1) {
 		throw new ProviderSyncError(
 			'unsupported_currency',
-			'OpenAI Costs API returned multiple currencies.'
+			'Anthropic Cost Report API returned multiple currencies.'
 		);
 	}
 
 	const currency = lines[0]?.currency ?? 'USD';
 	return {
-		provider: 'openai',
+		provider: 'anthropic',
 		periodStart: window.periodStart,
 		periodEndExclusive: window.periodEndExclusive,
 		totalAmount: lines.reduce((total, line) => total + line.amount, 0),
@@ -255,14 +263,14 @@ export async function fetchOpenAIMonthToDateCost(input: {
 	};
 }
 
-export const openaiProvider: ProviderDefinition = {
-	code: 'openai',
-	displayName: 'OpenAI',
-	connectionDisplayName: 'OpenAI API',
-	credentialName: 'OPENAI_ADMIN_KEY',
+export const anthropicProvider: ProviderDefinition = {
+	code: 'anthropic',
+	displayName: 'Anthropic',
+	connectionDisplayName: 'Anthropic API',
+	credentialName: 'ANTHROPIC_ADMIN_KEY',
 	defaultCurrency: 'USD',
 	defaultWarningRemainingAmount: 5,
 	defaultCriticalRemainingAmount: 1,
-	capabilities: ['costs', 'project_breakdown', 'line_item_breakdown'],
-	fetchMonthToDateCost: fetchOpenAIMonthToDateCost
+	capabilities: ['costs', 'workspace_breakdown', 'line_item_breakdown'],
+	fetchMonthToDateCost: fetchAnthropicMonthToDateCost
 };

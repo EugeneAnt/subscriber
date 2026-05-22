@@ -6,6 +6,11 @@ import {
 	normalizeBudgetInput,
 	toProviderConnectionCard
 } from './provider-costs';
+import {
+	configuredProviderDefinitions,
+	credentialNameForProvider,
+	resolveServerEnvCredential
+} from './providers';
 import type { Database } from '$lib/types/database';
 
 type ProviderConnectionViewRow = Database['public']['Views']['provider_connections_v']['Row'];
@@ -25,6 +30,33 @@ type RuntimeProviderConnectionViewRow = Omit<
 };
 
 describe('provider cost helpers', () => {
+	test('resolves configured provider credentials from explicit env maps', () => {
+		expect(credentialNameForProvider('openai')).toBe('OPENAI_ADMIN_KEY');
+		expect(credentialNameForProvider('anthropic')).toBe('ANTHROPIC_ADMIN_KEY');
+		expect(
+			configuredProviderDefinitions({
+				OPENAI_ADMIN_KEY: ' sk-admin-test ',
+				ANTHROPIC_ADMIN_KEY: ''
+			}).map((provider) => provider.code)
+		).toEqual(['openai']);
+		expect(
+			configuredProviderDefinitions({
+				OPENAI_ADMIN_KEY: '',
+				ANTHROPIC_ADMIN_KEY: ' sk-ant-admin-test '
+			}).map((provider) => provider.code)
+		).toEqual(['anthropic']);
+		expect(
+			resolveServerEnvCredential('anthropic', 'ANTHROPIC_ADMIN_KEY', {
+				ANTHROPIC_ADMIN_KEY: ' sk-ant-admin-test '
+			})
+		).toBe('sk-ant-admin-test');
+		expect(
+			resolveServerEnvCredential('anthropic', 'OPENAI_ADMIN_KEY', {
+				OPENAI_ADMIN_KEY: 'sk-admin-test'
+			})
+		).toBeNull();
+	});
+
 	test('parses cache minutes with a safe default', () => {
 		expect(cacheMinutesFromEnv(undefined)).toBe(60);
 		expect(cacheMinutesFromEnv('15')).toBe(15);
@@ -78,11 +110,11 @@ describe('provider cost helpers', () => {
 		expect(
 			toProviderConnectionCard({
 				id: 'connection-1',
-				provider_code: 'openai',
-				display_name: 'OpenAI API',
+				provider_code: 'anthropic',
+				display_name: 'Anthropic API',
 				status: 'active',
 				credential_source: 'server_env',
-				credential_name: 'OPENAI_ADMIN_KEY',
+				credential_name: 'ANTHROPIC_ADMIN_KEY',
 				currency: 'USD',
 				monthly_budget: '25.00',
 				warning_remaining_amount: '5.00',
@@ -97,8 +129,8 @@ describe('provider cost helpers', () => {
 		).toEqual(
 			expect.objectContaining({
 				id: 'connection-1',
-				provider_code: 'openai',
-				display_name: 'OpenAI API',
+				provider_code: 'anthropic',
+				display_name: 'Anthropic API',
 				current_period_spend: 12.5,
 				remaining_budget: 12.5,
 				budget_status: 'healthy'

@@ -13,15 +13,16 @@ import {
 import { consumeFlash, setFlash } from '$lib/server/flash';
 import {
 	cacheMinutesFromEnv,
-	ensureOpenAiConnection,
-	isOpenAiCostSyncConfigured,
+	ensureConfiguredProviderConnections,
+	isAnyProviderCostSyncConfigured,
 	isSnapshotFresh,
 	listLatestProviderCostLines,
 	listProviderConnections,
 	normalizeBudgetInput,
-	refreshOpenAiCost,
+	refreshProviderCost,
 	updateProviderBudget
 } from '$lib/server/provider-costs';
+import { configuredProviderDefinitions } from '$lib/server/providers';
 import { safeRedirectPath } from '$lib/server/redirects';
 import { countUnreadReminders, listDueReminders } from '$lib/server/reminders';
 import {
@@ -48,6 +49,63 @@ async function currentUserId(locals: App.Locals): Promise<string> {
 	}
 
 	return user.id;
+}
+
+type ProviderConnections = Awaited<ReturnType<typeof listProviderConnections>>;
+type ProviderLinesByConnection = Awaited<ReturnType<typeof listLatestProviderCostLines>>;
+type PaygPanelData = {
+	connections: ProviderConnections;
+	linesByConnection: ProviderLinesByConnection;
+	configured: boolean;
+	error: string | null;
+};
+
+async function loadPaygPanelData(locals: App.Locals, userId: string): Promise<PaygPanelData> {
+	const definitions = configuredProviderDefinitions();
+	const configured = definitions.length > 0;
+
+	if (!configured) {
+		return {
+			connections: [],
+			linesByConnection: {},
+			configured: false,
+			error: null
+		};
+	}
+
+	try {
+		await ensureConfiguredProviderConnections(locals.supabase, userId, definitions);
+		let connections = await listProviderConnections(locals.supabase);
+
+		const cacheMinutes = cacheMinutesFromEnv();
+		for (const connection of connections) {
+			if (!isSnapshotFresh(connection.latest_fetched_at, cacheMinutes)) {
+				try {
+					await refreshProviderCost(locals.supabase, userId, connection.id);
+				} catch {
+					// The helper stores sync error metadata; keep old snapshot data visible.
+				}
+			}
+		}
+
+		connections = await listProviderConnections(locals.supabase);
+		return {
+			connections,
+			linesByConnection: await listLatestProviderCostLines(
+				locals.supabase,
+				connections.map((connection) => connection.id)
+			),
+			configured,
+			error: null
+		};
+	} catch (loadError) {
+		return {
+			connections: [],
+			linesByConnection: {},
+			configured,
+			error: loadError instanceof Error ? loadError.message : 'Provider costs could not load.'
+		};
+	}
 }
 
 function secure(url: URL): boolean {
@@ -77,6 +135,18 @@ export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	const filters = parseDashboardFilters(url.searchParams);
 	const flash = consumeFlash(cookies);
 	const today = todayIso();
+	const providerConfigured = isAnyProviderCostSyncConfigured();
+	let paygData = Promise.resolve<PaygPanelData>({
+		connections: [],
+		linesByConnection: {},
+		configured: providerConfigured,
+		error: null
+	});
+
+	if (tab === 'payg') {
+		const userId = await currentUserId(locals);
+		paygData = loadPaygPanelData(locals, userId);
+	}
 	const filteredItemsPromise = hasDashboardFilters(filters)
 		? listItemsForTable(locals.supabase, filters)
 		: null;
@@ -98,38 +168,10 @@ export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	const { categories, providers } = getDistinctOptions(allItems);
 	const { activeCount, upcoming30Count } = getDashboardSummary(allItems, events, today);
 
-	let providerConnections: Awaited<ReturnType<typeof listProviderConnections>> = [];
-	let providerLinesByConnection: Awaited<ReturnType<typeof listLatestProviderCostLines>> = {};
-	const providerConfigured = isOpenAiCostSyncConfigured();
+	let providerConnections: ProviderConnections = [];
 
 	if (providerConfigured) {
 		providerConnections = await listProviderConnections(locals.supabase);
-	}
-
-	if (tab === 'payg') {
-		const userId = await currentUserId(locals);
-
-		if (providerConfigured) {
-			await ensureOpenAiConnection(locals.supabase, userId);
-			providerConnections = await listProviderConnections(locals.supabase);
-
-			const cacheMinutes = cacheMinutesFromEnv();
-			for (const connection of providerConnections) {
-				if (!isSnapshotFresh(connection.latest_fetched_at, cacheMinutes)) {
-					try {
-						await refreshOpenAiCost(locals.supabase, userId, connection.id);
-					} catch {
-						// The helper stores sync error metadata; keep old snapshot data visible.
-					}
-				}
-			}
-
-			providerConnections = await listProviderConnections(locals.supabase);
-			providerLinesByConnection = await listLatestProviderCostLines(
-				locals.supabase,
-				providerConnections.map((connection) => connection.id)
-			);
-		}
 	}
 
 	return {
@@ -146,9 +188,8 @@ export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 		providers,
 		reminders: reminderRows,
 		reminderCount,
-		providerConnections,
 		providerConfigured,
-		providerLinesByConnection,
+		paygData,
 		flash
 	};
 };
@@ -175,7 +216,7 @@ export const actions: Actions = {
 		}
 
 		try {
-			await refreshOpenAiCost(locals.supabase, await currentUserId(locals), connectionId);
+			await refreshProviderCost(locals.supabase, await currentUserId(locals), connectionId);
 			setFlash(cookies, 'provider_refreshed', secure(url));
 		} catch (providerError) {
 			return fail(400, {

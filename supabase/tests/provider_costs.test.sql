@@ -11,9 +11,10 @@ insert into auth.users (id, email)
 set local "request.jwt.claims" = '{"sub":"00000000-0000-0000-0000-000000000301","role":"authenticated"}';
 set local role authenticated;
 
-select lives_ok(
-  $$ select code, display_name from public.provider_catalog where code = 'openai' $$,
-  'authenticated users can read provider catalog'
+select set_eq(
+  $$ select code from public.provider_catalog order by code $$,
+  array['anthropic', 'openai'],
+  'authenticated users can read supported provider catalog'
 );
 
 select throws_ok(

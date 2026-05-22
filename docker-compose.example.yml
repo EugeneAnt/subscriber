@@ -11,3 +11,6 @@ services:
       SUPABASE_PUBLISHABLE_KEY: replace-with-publishable-key
       ORIGIN: http://localhost:3000
       BODY_SIZE_LIMIT: 524288
+      PROVIDER_COST_CACHE_MINUTES: 60
+      # OPENAI_ADMIN_KEY:
+      # ANTHROPIC_ADMIN_KEY:

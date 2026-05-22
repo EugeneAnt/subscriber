@@ -3,10 +3,19 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { env as privateEnv } from '$env/dynamic/private';
 import type { Database } from '$lib/types/database';
 
-import { resolveServerEnvCredential } from './providers';
+import {
+	configuredProviderDefinitions,
+	isProviderCode,
+	providerDefinition,
+	resolveServerEnvCredential
+} from './providers';
 import { ProviderSyncError, safeProviderErrorMessage } from './providers/errors';
-import { openaiProvider } from './providers/openai';
-import type { ProviderCostFetchResult } from './providers/types';
+import type {
+	ProviderCode,
+	ProviderCostFetchResult,
+	ProviderCostFetcher,
+	ProviderDefinition
+} from './providers/types';
 
 type Client = Pick<SupabaseClient<Database>, 'from'>;
 type ProviderConnectionInsert = Database['public']['Tables']['provider_connections']['Insert'];
@@ -32,9 +41,6 @@ type ProviderConnectionViewInput = Omit<
 	remaining_budget?: unknown;
 };
 
-const openAiDisplayName = 'OpenAI API';
-const openAiCredentialName = 'OPENAI_ADMIN_KEY';
-
 export type ProviderBudgetPatch = Pick<
 	ProviderConnectionUpdate,
 	'monthly_budget' | 'warning_remaining_amount' | 'critical_remaining_amount'
@@ -42,22 +48,23 @@ export type ProviderBudgetPatch = Pick<
 
 export type ProviderConnectionCard = ProviderConnectionViewRow & {
 	id: string;
-	provider_code: 'openai';
+	provider_code: ProviderCode;
 	display_name: string;
 	budget_status: 'unknown' | 'healthy' | 'warning' | 'critical' | 'over_budget' | 'sync_error';
 	current_period_spend: number | null;
 	remaining_budget: number | null;
 };
 
-type OpenAiCostFetcher = (input: {
-	adminKey: string;
-	projectIds?: string[];
-	now: Date;
-}) => Promise<ProviderCostFetchResult>;
 type ServerEnvCredentialResolver = (
-	providerCode: 'openai',
+	providerCode: ProviderCode,
 	credentialName: string
 ) => string | null;
+
+type RefreshProviderCostOptions = {
+	now?: Date;
+	fetchMonthToDateCost?: ProviderCostFetcher;
+	resolveCredential?: ServerEnvCredentialResolver;
+};
 
 function parseNumeric(value: unknown): number | null {
 	if (typeof value === 'number') {
@@ -131,7 +138,8 @@ export function toProviderConnectionCard(
 
 	if (
 		typeof row.id !== 'string' ||
-		row.provider_code !== 'openai' ||
+		typeof row.provider_code !== 'string' ||
+		!isProviderCode(row.provider_code) ||
 		typeof row.display_name !== 'string' ||
 		!(
 			status === 'unknown' ||
@@ -148,7 +156,7 @@ export function toProviderConnectionCard(
 	return {
 		...row,
 		id: row.id,
-		provider_code: 'openai',
+		provider_code: row.provider_code,
 		display_name: row.display_name,
 		budget_status: status,
 		current_period_spend: spend,
@@ -156,27 +164,34 @@ export function toProviderConnectionCard(
 	} as ProviderConnectionCard;
 }
 
-export function defaultOpenAiConnection(userId: string): ProviderConnectionInsert {
+export function defaultProviderConnection(
+	userId: string,
+	definition: ProviderDefinition
+): ProviderConnectionInsert {
 	return {
 		user_id: userId,
-		provider_code: 'openai',
-		display_name: openAiDisplayName,
+		provider_code: definition.code,
+		display_name: definition.connectionDisplayName,
 		credential_source: 'server_env',
-		credential_name: openAiCredentialName,
-		currency: 'USD',
-		warning_remaining_amount: 5,
-		critical_remaining_amount: 1
+		credential_name: definition.credentialName,
+		currency: definition.defaultCurrency,
+		warning_remaining_amount: definition.defaultWarningRemainingAmount,
+		critical_remaining_amount: definition.defaultCriticalRemainingAmount
 	};
 }
 
-export function isOpenAiCostSyncConfigured(): boolean {
-	return resolveServerEnvCredential('openai', openAiCredentialName) !== null;
+export function isAnyProviderCostSyncConfigured(): boolean {
+	return configuredProviderDefinitions().length > 0;
 }
 
-export async function ensureOpenAiConnection(supabase: Client, userId: string): Promise<void> {
+export async function ensureProviderConnection(
+	supabase: Client,
+	userId: string,
+	definition: ProviderDefinition
+): Promise<void> {
 	const { error } = await supabase
 		.from('provider_connections')
-		.upsert(defaultOpenAiConnection(userId), {
+		.upsert(defaultProviderConnection(userId, definition), {
 			// Supabase JS/PostgREST expects comma-separated unique column names here,
 			// not the Postgres constraint name.
 			onConflict: 'user_id,provider_code,display_name',
@@ -185,6 +200,16 @@ export async function ensureOpenAiConnection(supabase: Client, userId: string): 
 
 	if (error) {
 		throw error;
+	}
+}
+
+export async function ensureConfiguredProviderConnections(
+	supabase: Client,
+	userId: string,
+	definitions = configuredProviderDefinitions()
+): Promise<void> {
+	for (const definition of definitions) {
+		await ensureProviderConnection(supabase, userId, definition);
 	}
 }
 
@@ -327,14 +352,13 @@ async function updateConnectionSyncStatus(
 	}
 }
 
-export async function refreshOpenAiCost(
+export async function refreshProviderCost(
 	supabase: Client,
 	userId: string,
 	connectionId: string,
-	now = new Date(),
-	fetchMonthToDateCost: OpenAiCostFetcher = openaiProvider.fetchMonthToDateCost,
-	resolveCredential: ServerEnvCredentialResolver = resolveServerEnvCredential
+	options: RefreshProviderCostOptions = {}
 ): Promise<void> {
+	const now = options.now ?? new Date();
 	const startedAt = now.toISOString();
 	await updateConnectionSyncStatus(supabase, connectionId, {
 		last_sync_started_at: startedAt,
@@ -345,22 +369,45 @@ export async function refreshOpenAiCost(
 	try {
 		const { data: connection, error } = await supabase
 			.from('provider_connections')
-			.select('credential_name, external_project_ids')
+			.select('provider_code, credential_name, external_project_ids')
 			.eq('id', connectionId)
 			.single();
 
 		if (error) throw error;
 
-		const adminKey = resolveCredential('openai', connection.credential_name ?? '');
-		if (!adminKey) {
-			throw new ProviderSyncError('not_configured', 'OPENAI_ADMIN_KEY is not configured.');
+		if (!isProviderCode(connection.provider_code)) {
+			throw new ProviderSyncError(
+				'bad_response',
+				`Unsupported provider ${connection.provider_code}.`
+			);
 		}
 
+		const definition = providerDefinition(connection.provider_code);
+		const resolveCredential = options.resolveCredential ?? resolveServerEnvCredential;
+		const adminKey = resolveCredential(
+			definition.code,
+			connection.credential_name ?? definition.credentialName
+		);
+		if (!adminKey) {
+			throw new ProviderSyncError(
+				'not_configured',
+				`${definition.credentialName} is not configured.`
+			);
+		}
+
+		const fetchMonthToDateCost = options.fetchMonthToDateCost ?? definition.fetchMonthToDateCost;
 		const result = await fetchMonthToDateCost({
 			adminKey,
 			projectIds: connection.external_project_ids,
 			now
 		});
+
+		if (result.provider !== definition.code) {
+			throw new ProviderSyncError(
+				'bad_response',
+				`${definition.displayName} adapter returned mismatched provider data.`
+			);
+		}
 
 		if (!(await latestSnapshotMatches(supabase, connectionId, result))) {
 			const { data: snapshot, error: snapshotError } = await supabase

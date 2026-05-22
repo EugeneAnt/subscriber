@@ -56,11 +56,21 @@
 	{/if}
 
 	{#if data.tab === 'payg'}
-		<PayAsYouGoPanel
-			connections={data.providerConnections}
-			linesByConnection={data.providerLinesByConnection}
-			configured={data.providerConfigured}
-		/>
+		{#await data.paygData}
+			<PayAsYouGoPanel
+				connections={[]}
+				linesByConnection={{}}
+				configured={data.providerConfigured}
+				loading
+			/>
+		{:then paygData}
+			<PayAsYouGoPanel
+				connections={paygData.connections}
+				linesByConnection={paygData.linesByConnection}
+				configured={paygData.configured}
+				error={paygData.error}
+			/>
+		{/await}
 	{:else if data.items.length === 0 && Object.keys(data.filters).length === 0}
 		<EmptyState
 			title="No items yet"

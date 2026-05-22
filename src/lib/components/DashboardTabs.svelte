@@ -10,7 +10,6 @@
 	<!-- eslint-disable svelte/no-navigation-without-resolve -- URL-backed tabs need the query string preserved. -->
 	<a
 		href="/"
-		data-sveltekit-reload
 		class={cn(
 			'min-h-11 border-b-2 px-3 py-2 text-sm font-medium transition-colors',
 			active === 'subscriptions'
@@ -23,7 +22,6 @@
 	</a>
 	<a
 		href="/?tab=payg"
-		data-sveltekit-reload
 		class={cn(
 			'min-h-11 border-b-2 px-3 py-2 text-sm font-medium transition-colors',
 			active === 'payg'

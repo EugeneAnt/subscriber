@@ -11,7 +11,7 @@ It uses Supabase for Auth, Postgres, PostgREST, and Row Level Security. The app 
 - Dashboard summary tiles for active items, upcoming events, subscription burn, and pay-as-you-go spend
 - Upcoming events, filters, desktop table, and mobile card list
 - In-app payment reminders 7 days and 1 day before upcoming billing dates
-- Optional OpenAI API pay-as-you-go cost sync with current-month spend and local budget status
+- Optional OpenAI and Anthropic pay-as-you-go cost sync with current-month spend and local budget status
 - Calendar-aware billing rollover in Postgres
 - Per-currency monthly and annualized burn views
 - Server-side validation with Valibot and sveltekit-superforms
@@ -45,16 +45,19 @@ SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 ORIGIN=https://your-app.example.com
 BODY_SIZE_LIMIT=524288
 
-# Optional: enables the Pay-as-you-go OpenAI API cost tab.
+# Optional: enables pay-as-you-go provider cost cards.
 OPENAI_ADMIN_KEY=<optional-openai-admin-key>
+ANTHROPIC_ADMIN_KEY=<optional-anthropic-admin-key>
 PROVIDER_COST_CACHE_MINUTES=60
 ```
 
 `SUPABASE_ANON_KEY` is still accepted as a legacy fallback for local or self-hosted Supabase setups. `SUPABASE_SERVICE_ROLE_KEY` is intentionally not used by the application runtime. Keep service-role or secret keys for local admin scripts and tests only.
 
-`OPENAI_ADMIN_KEY` is optional. The app starts without it and shows a configuration state on the Pay-as-you-go tab. The key is read only by SvelteKit server code and is never sent to the browser or stored in Supabase.
+Provider admin keys are optional. The app starts without them and shows a configuration state on the Pay-as-you-go tab. Keys are read only by SvelteKit server code and are never sent to the browser or stored in Supabase.
 
 OpenAI cost sync reads organization spend from the OpenAI Costs API. OpenAI does not currently expose a documented remaining-credit balance through the Admin API, so Subscriber treats the budget fields as local tracking thresholds and calculates remaining budget from the synced current-month spend.
+
+Anthropic cost sync reads organization spend from the Anthropic Usage and Cost Admin API. It requires an organization Admin API key (`sk-ant-admin...`) in `ANTHROPIC_ADMIN_KEY`; individual Anthropic accounts and Claude Platform on AWS do not expose the required programmatic cost endpoint.
 
 For local development, copy `.env.example`:
 
@@ -219,7 +222,7 @@ For any reverse proxy or hosted runtime:
 - route traffic to container port `3000`
 - set `ORIGIN` to the public app URL
 - set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`
-- optionally set `OPENAI_ADMIN_KEY` for OpenAI pay-as-you-go cost sync
+- optionally set `OPENAI_ADMIN_KEY` and/or `ANTHROPIC_ADMIN_KEY` for pay-as-you-go cost sync
 - never expose service-role keys to the app runtime
 
 ## License

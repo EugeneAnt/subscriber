@@ -1,13 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 
 import {
-	defaultOpenAiConnection,
-	ensureOpenAiConnection,
+	defaultProviderConnection,
+	ensureConfiguredProviderConnections,
 	listLatestProviderCostLines,
 	listProviderConnections,
-	refreshOpenAiCost,
+	refreshProviderCost,
 	updateProviderBudget
 } from '../../src/lib/server/provider-costs';
+import { providerDefinition } from '../../src/lib/server/providers';
 import type { ProviderCostFetchResult } from '../../src/lib/server/providers/types';
 import { createTestUser, deleteTestUser, signedInClient } from './helpers/supabase';
 
@@ -15,9 +16,12 @@ let userId: string;
 let email: string;
 let client: Awaited<ReturnType<typeof signedInClient>>;
 
-function fixtureCost(totalAmount = 12.5): ProviderCostFetchResult {
+function fixtureCost(
+	totalAmount = 12.5,
+	provider: ProviderCostFetchResult['provider'] = 'openai'
+): ProviderCostFetchResult {
 	return {
-		provider: 'openai',
+		provider,
 		periodStart: '2026-05-01',
 		periodEndExclusive: '2026-05-23',
 		totalAmount,
@@ -48,21 +52,37 @@ describe('provider cost helpers', () => {
 		await deleteTestUser(userId);
 	});
 
-	test('creates the default OpenAI connection idempotently', async () => {
-		await ensureOpenAiConnection(client, userId);
-		await ensureOpenAiConnection(client, userId);
+	test('creates configured provider connections idempotently', async () => {
+		await ensureConfiguredProviderConnections(client, userId, [
+			providerDefinition('openai'),
+			providerDefinition('anthropic')
+		]);
+		await ensureConfiguredProviderConnections(client, userId, [
+			providerDefinition('openai'),
+			providerDefinition('anthropic')
+		]);
 
 		const rows = await listProviderConnections(client);
-		expect(rows).toHaveLength(1);
-		expect(rows[0]).toMatchObject({
-			provider_code: 'openai',
-			display_name: 'OpenAI API',
-			budget_status: 'unknown'
-		});
+		expect(rows).toHaveLength(2);
+		expect(rows.map((row) => row.provider_code).sort()).toEqual(['anthropic', 'openai']);
+		expect(rows).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					provider_code: 'anthropic',
+					display_name: 'Anthropic API',
+					budget_status: 'unknown'
+				}),
+				expect.objectContaining({
+					provider_code: 'openai',
+					display_name: 'OpenAI API',
+					budget_status: 'unknown'
+				})
+			])
+		);
 	});
 
 	test('updates budget settings', async () => {
-		await ensureOpenAiConnection(client, userId);
+		await ensureConfiguredProviderConnections(client, userId, [providerDefinition('openai')]);
 		const [connection] = await listProviderConnections(client);
 
 		await updateProviderBudget(client, connection.id, {
@@ -78,7 +98,7 @@ describe('provider cost helpers', () => {
 	});
 
 	test('view shows latest snapshot and line rows are RLS scoped', async () => {
-		await ensureOpenAiConnection(client, userId);
+		await ensureConfiguredProviderConnections(client, userId, [providerDefinition('openai')]);
 		const [connection] = await listProviderConnections(client);
 
 		const { data: snapshot, error: snapshotError } = await client
@@ -126,30 +146,24 @@ describe('provider cost helpers', () => {
 	});
 
 	test('refresh persists a sanitized snapshot and deduplicates repeated identical results', async () => {
-		await ensureOpenAiConnection(client, userId);
+		await ensureConfiguredProviderConnections(client, userId, [providerDefinition('openai')]);
 		const [connection] = await listProviderConnections(client);
 
 		const resolveCredential = () => 'sk-test-provider-costs';
 
-		await refreshOpenAiCost(
-			client,
-			userId,
-			connection.id,
-			new Date('2026-05-22T10:00:00.000Z'),
-			async ({ adminKey }) => {
+		await refreshProviderCost(client, userId, connection.id, {
+			now: new Date('2026-05-22T10:00:00.000Z'),
+			fetchMonthToDateCost: async ({ adminKey }) => {
 				expect(adminKey).toBe('sk-test-provider-costs');
 				return fixtureCost(12.5);
 			},
 			resolveCredential
-		);
-		await refreshOpenAiCost(
-			client,
-			userId,
-			connection.id,
-			new Date('2026-05-22T10:01:00.000Z'),
-			async () => fixtureCost(12.5),
+		});
+		await refreshProviderCost(client, userId, connection.id, {
+			now: new Date('2026-05-22T10:01:00.000Z'),
+			fetchMonthToDateCost: async () => fixtureCost(12.5),
 			resolveCredential
-		);
+		});
 
 		const { data: snapshots, error: snapshotError } = await client
 			.from('provider_cost_snapshots')
@@ -169,10 +183,42 @@ describe('provider cost helpers', () => {
 		expect(lines).toEqual([{ line_item: 'text', amount: 12.5 }]);
 	});
 
+	test('refresh supports an injected Anthropic fixture', async () => {
+		await ensureConfiguredProviderConnections(client, userId, [providerDefinition('anthropic')]);
+		const [connection] = await listProviderConnections(client);
+
+		await refreshProviderCost(client, userId, connection.id, {
+			now: new Date('2026-05-22T10:00:00.000Z'),
+			fetchMonthToDateCost: async ({ adminKey }) => {
+				expect(adminKey).toBe('sk-ant-admin-provider-costs');
+				return fixtureCost(3.5, 'anthropic');
+			},
+			resolveCredential: () => 'sk-ant-admin-provider-costs'
+		});
+
+		const [updated] = await listProviderConnections(client);
+		expect(updated).toMatchObject({
+			provider_code: 'anthropic',
+			current_period_spend: 3.5,
+			current_period_currency: 'USD'
+		});
+
+		const linesByConnection = await listLatestProviderCostLines(client, [connection.id]);
+		expect(linesByConnection[connection.id]).toEqual([
+			expect.objectContaining({
+				amount: 3.5,
+				currency: 'USD'
+			})
+		]);
+	});
+
 	test('RLS blocks another user from writing this user id', async () => {
 		await expect(
 			client.from('provider_connections').insert({
-				...defaultOpenAiConnection('00000000-0000-0000-0000-000000000999'),
+				...defaultProviderConnection(
+					'00000000-0000-0000-0000-000000000999',
+					providerDefinition('openai')
+				),
 				display_name: 'Wrong user'
 			})
 		).resolves.toMatchObject({ error: expect.objectContaining({ code: '42501' }) });

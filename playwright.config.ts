@@ -27,6 +27,13 @@ if (env.E2E_OPENAI_ADMIN_KEY) {
 	env.OPENAI_ADMIN_KEY = '';
 }
 
+if (env.E2E_ANTHROPIC_ADMIN_KEY) {
+	env.ANTHROPIC_ADMIN_KEY = env.E2E_ANTHROPIC_ADMIN_KEY;
+} else {
+	// Keep default E2E runs on fixture/no-secret states; never call live Anthropic by accident.
+	env.ANTHROPIC_ADMIN_KEY = '';
+}
+
 Object.assign(process.env, env);
 
 const port = env.E2E_PORT ?? '5173';
