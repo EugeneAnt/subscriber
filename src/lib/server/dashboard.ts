@@ -7,8 +7,10 @@ import type {
 	DashboardBurn,
 	DashboardEvent,
 	DashboardFilters,
-	DashboardItem
+	DashboardItem,
+	DashboardPaygSpend
 } from '$lib/types/dashboard';
+import type { ProviderConnectionCard } from './provider-costs';
 import type { Database } from '$lib/types/database';
 
 type TrackedItemType = Database['public']['Enums']['tracked_item_type'];
@@ -104,6 +106,26 @@ export function toDashboardBurn(rows: Partial<TrackedItemBurnRow>[]): DashboardB
 
 		return [{ currency: row.currency, monthly_burn: monthlyBurn }];
 	});
+}
+
+export function toDashboardPaygSpend(connections: ProviderConnectionCard[]): DashboardPaygSpend[] {
+	const totalsByCurrency = new Map<string, number>();
+
+	for (const connection of connections) {
+		const currency = connection.current_period_currency;
+		const spend = connection.current_period_spend;
+
+		if (typeof currency !== 'string' || spend === null) {
+			continue;
+		}
+
+		totalsByCurrency.set(currency, (totalsByCurrency.get(currency) ?? 0) + spend);
+	}
+
+	return Array.from(totalsByCurrency, ([currency, current_month_spend]) => ({
+		currency,
+		current_month_spend
+	})).sort((a, b) => a.currency.localeCompare(b.currency));
 }
 
 export function getDashboardSummary(

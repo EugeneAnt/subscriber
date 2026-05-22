@@ -41,6 +41,7 @@
 		activeCount={data.activeCount}
 		upcoming30Count={data.upcoming30Count}
 		burn={data.burn}
+		paygSpend={data.paygSpend}
 	/>
 
 	<DashboardTabs active={data.tab} />

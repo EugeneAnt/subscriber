@@ -1,13 +1,14 @@
 <script lang="ts">
-	import type { DashboardBurn } from '$lib/types/dashboard';
+	import type { DashboardBurn, DashboardPaygSpend } from '$lib/types/dashboard';
 
 	type Props = {
 		activeCount: number;
 		upcoming30Count: number;
 		burn: DashboardBurn[];
+		paygSpend: DashboardPaygSpend[];
 	};
 
-	let { activeCount, upcoming30Count, burn }: Props = $props();
+	let { activeCount, upcoming30Count, burn, paygSpend }: Props = $props();
 
 	const formatAmount = (value: number) =>
 		new Intl.NumberFormat(undefined, {
@@ -36,6 +37,16 @@
 			<p class="text-xs text-muted-foreground tabular-nums">
 				{formatAmount(row.monthly_burn * 12)} / year
 			</p>
+		</div>
+	{/each}
+
+	{#each paygSpend as row (row.currency)}
+		<div class="rounded-lg border bg-card p-4 text-card-foreground">
+			<p class="text-sm text-muted-foreground">Pay-as-you-go spend ({row.currency})</p>
+			<p class="mt-1 text-2xl font-semibold tabular-nums">
+				{formatAmount(row.current_month_spend)}
+			</p>
+			<p class="text-xs text-muted-foreground">Current month</p>
 		</div>
 	{/each}
 </section>

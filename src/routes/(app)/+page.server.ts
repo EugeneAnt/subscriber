@@ -7,6 +7,7 @@ import {
 	toDashboardBurn,
 	toDashboardEvents,
 	toDashboardItems,
+	toDashboardPaygSpend,
 	todayIso
 } from '$lib/server/dashboard';
 import { consumeFlash, setFlash } from '$lib/server/flash';
@@ -99,11 +100,14 @@ export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 
 	let providerConnections: Awaited<ReturnType<typeof listProviderConnections>> = [];
 	let providerLinesByConnection: Awaited<ReturnType<typeof listLatestProviderCostLines>> = {};
-	let providerConfigured = false;
+	const providerConfigured = isOpenAiCostSyncConfigured();
+
+	if (providerConfigured) {
+		providerConnections = await listProviderConnections(locals.supabase);
+	}
 
 	if (tab === 'payg') {
 		const userId = await currentUserId(locals);
-		providerConfigured = isOpenAiCostSyncConfigured();
 
 		if (providerConfigured) {
 			await ensureOpenAiConnection(locals.supabase, userId);
@@ -134,6 +138,7 @@ export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 		events,
 		today,
 		burn,
+		paygSpend: toDashboardPaygSpend(providerConnections),
 		activeCount,
 		upcoming30Count,
 		filters,

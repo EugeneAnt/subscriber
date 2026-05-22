@@ -6,7 +6,8 @@ import {
 	parseDashboardFilters,
 	toDashboardBurn,
 	toDashboardEvents,
-	toDashboardItems
+	toDashboardItems,
+	toDashboardPaygSpend
 } from './dashboard';
 
 describe('dashboard helpers', () => {
@@ -79,6 +80,34 @@ describe('dashboard helpers', () => {
 		).toEqual([
 			{ currency: 'USD', monthly_burn: 12.5 },
 			{ currency: 'GBP', monthly_burn: 7.25 }
+		]);
+
+		expect(
+			toDashboardPaygSpend([
+				{
+					current_period_currency: 'USD',
+					current_period_spend: 2.5
+				},
+				{
+					current_period_currency: 'USD',
+					current_period_spend: 3.25
+				},
+				{
+					current_period_currency: 'EUR',
+					current_period_spend: 1
+				},
+				{
+					current_period_currency: null,
+					current_period_spend: 10
+				},
+				{
+					current_period_currency: 'KZT',
+					current_period_spend: null
+				}
+			] as Parameters<typeof toDashboardPaygSpend>[0])
+		).toEqual([
+			{ currency: 'EUR', current_month_spend: 1 },
+			{ currency: 'USD', current_month_spend: 5.75 }
 		]);
 	});
 

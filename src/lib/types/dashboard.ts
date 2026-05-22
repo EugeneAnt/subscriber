@@ -36,3 +36,8 @@ export type DashboardBurn = {
 	currency: string;
 	monthly_burn: number;
 };
+
+export type DashboardPaygSpend = {
+	currency: string;
+	current_month_spend: number;
+};
