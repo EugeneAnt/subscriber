@@ -142,6 +142,24 @@ describe('OpenAI provider adapter', () => {
 		expect(new URL(calls[1]).searchParams.get('page')).toBe('cursor-2');
 	});
 
+	test('reports the configured pagination safety limit', async () => {
+		await expect(
+			fetchOpenAIMonthToDateCost({
+				adminKey: 'sk-admin-test',
+				now: new Date('2026-05-22T13:30:00.000Z'),
+				fetch: async () =>
+					jsonResponse({
+						has_more: true,
+						next_page: 'cursor',
+						data: []
+					})
+			})
+		).rejects.toMatchObject({
+			kind: 'bad_response',
+			message: 'OpenAI Costs API pagination exceeded safety limit of 20 pages.'
+		});
+	});
+
 	test('passes project filters when configured', async () => {
 		const calls: string[] = [];
 		const fixtureFetch = async (url: string | URL | Request) => {

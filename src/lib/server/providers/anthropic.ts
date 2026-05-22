@@ -1,8 +1,16 @@
 import { ProviderSyncError } from './errors';
+import {
+	isSupportedCurrency,
+	numericValue,
+	paginationSafetyLimitMessage,
+	redactProviderSecrets,
+	utcMonthWindow as sharedUtcMonthWindow
+} from './shared';
 import type { ProviderCostFetchResult, ProviderCostLine, ProviderDefinition } from './types';
 
+// https://platform.claude.com/docs/en/api/admin/cost_report/retrieve
 const costReportUrl = 'https://api.anthropic.com/v1/organizations/cost_report';
-const supportedCurrencies = new Set(['USD']);
+const supportedCurrencies = ['USD'] as const;
 const maxPages = 20;
 
 type MonthWindow = {
@@ -37,21 +45,14 @@ type AnthropicCostPage = {
 	data?: unknown;
 };
 
-function isoDate(date: Date): string {
-	return date.toISOString().slice(0, 10);
-}
-
 export function utcMonthWindow(now: Date): MonthWindow {
-	const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-	const tomorrow = new Date(
-		Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)
-	);
+	const window = sharedUtcMonthWindow(now);
 
 	return {
-		periodStart: isoDate(monthStart),
-		periodEndExclusive: isoDate(tomorrow),
-		startingAt: monthStart.toISOString(),
-		endingAt: tomorrow.toISOString()
+		periodStart: window.periodStart,
+		periodEndExclusive: window.periodEndExclusive,
+		startingAt: window.startingAt,
+		endingAt: window.endingAt
 	};
 }
 
@@ -71,10 +72,6 @@ function buildCostReportUrl(window: MonthWindow, page: string | null): URL {
 	return url;
 }
 
-function redact(value: string): string {
-	return value.replace(/sk-[A-Za-z0-9_-]+/g, '[redacted]');
-}
-
 async function readPage(response: Response): Promise<AnthropicCostPage> {
 	const text = await response.text();
 
@@ -89,7 +86,9 @@ async function readPage(response: Response): Promise<AnthropicCostPage> {
 						: 'bad_response';
 		throw new ProviderSyncError(
 			kind,
-			redact(`Anthropic Cost Report API failed with HTTP ${response.status}: ${text}`),
+			redactProviderSecrets(
+				`Anthropic Cost Report API failed with HTTP ${response.status}: ${text}`
+			),
 			{ status: response.status }
 		);
 	}
@@ -107,26 +106,8 @@ async function readPage(response: Response): Promise<AnthropicCostPage> {
 	}
 }
 
-function centsValue(value: unknown): number | null {
-	if (typeof value === 'number') {
-		return Number.isFinite(value) ? value : null;
-	}
-
-	if (typeof value !== 'string') {
-		return null;
-	}
-
-	const trimmed = value.trim();
-	if (trimmed === '') {
-		return null;
-	}
-
-	const parsed = Number(trimmed);
-	return Number.isFinite(parsed) ? parsed : null;
-}
-
 function amountFromResult(result: AnthropicCostResult): { value: number; currency: string } {
-	const value = centsValue(result.amount);
+	const value = numericValue(result.amount);
 	const currency = result.currency;
 
 	if (value === null || typeof currency !== 'string') {
@@ -137,7 +118,7 @@ function amountFromResult(result: AnthropicCostResult): { value: number; currenc
 	}
 
 	const normalizedCurrency = currency.toUpperCase();
-	if (!supportedCurrencies.has(normalizedCurrency)) {
+	if (!isSupportedCurrency(normalizedCurrency, supportedCurrencies)) {
 		throw new ProviderSyncError(
 			'unsupported_currency',
 			`Anthropic Cost Report API returned unsupported currency ${normalizedCurrency}.`
@@ -196,6 +177,13 @@ export async function fetchAnthropicMonthToDateCost(input: {
 	now: Date;
 	fetch?: typeof fetch;
 }): Promise<ProviderCostFetchResult> {
+	if (input.projectIds && input.projectIds.length > 0) {
+		throw new ProviderSyncError(
+			'unsupported_filter',
+			'Anthropic Cost Report API does not support external project/workspace filters; it is grouped by workspace instead.'
+		);
+	}
+
 	const fetchImpl = input.fetch ?? fetch;
 	const window = utcMonthWindow(input.now);
 	const pages: AnthropicCostPage[] = [];
@@ -213,7 +201,8 @@ export async function fetchAnthropicMonthToDateCost(input: {
 				}
 			});
 		} catch (error) {
-			const message = error instanceof Error ? redact(error.message) : 'Network request failed.';
+			const message =
+				error instanceof Error ? redactProviderSecrets(error.message) : 'Network request failed.';
 			throw new ProviderSyncError(
 				'network',
 				`Anthropic Cost Report API request failed: ${message}`
@@ -237,7 +226,7 @@ export async function fetchAnthropicMonthToDateCost(input: {
 		if (pageIndex === maxPages - 1) {
 			throw new ProviderSyncError(
 				'bad_response',
-				'Anthropic Cost Report API pagination exceeded safety limit.'
+				paginationSafetyLimitMessage('Anthropic Cost Report API', maxPages)
 			);
 		}
 	}
@@ -271,6 +260,7 @@ export const anthropicProvider: ProviderDefinition = {
 	defaultCurrency: 'USD',
 	defaultWarningRemainingAmount: 5,
 	defaultCriticalRemainingAmount: 1,
+	externalProjectFilter: null,
 	capabilities: ['costs', 'workspace_breakdown', 'line_item_breakdown'],
 	fetchMonthToDateCost: fetchAnthropicMonthToDateCost
 };

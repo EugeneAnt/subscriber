@@ -4,7 +4,8 @@ export type ProviderErrorKind =
 	| 'rate_limited'
 	| 'network'
 	| 'bad_response'
-	| 'unsupported_currency';
+	| 'unsupported_currency'
+	| 'unsupported_filter';
 
 export class ProviderSyncError extends Error {
 	readonly kind: ProviderErrorKind;

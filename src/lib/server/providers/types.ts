@@ -9,6 +9,8 @@ export type ProviderCapability =
 	| 'workspace_breakdown'
 	| 'line_item_breakdown';
 
+export type ProviderExternalProjectFilter = 'project_ids' | null;
+
 export type ProviderCostLine = {
 	externalProjectId?: string | null;
 	externalApiKeyId?: string | null;
@@ -45,6 +47,7 @@ export type ProviderDefinition = {
 	defaultCurrency: string;
 	defaultWarningRemainingAmount: number | null;
 	defaultCriticalRemainingAmount: number | null;
+	externalProjectFilter: ProviderExternalProjectFilter;
 	capabilities: ProviderCapability[];
 	fetchMonthToDateCost: ProviderCostFetcher;
 };

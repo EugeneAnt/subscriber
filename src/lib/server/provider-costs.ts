@@ -2,7 +2,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { env as privateEnv } from '$env/dynamic/private';
 import type { Database } from '$lib/types/database';
-import { isTimestampFresh } from '$lib/provider-cost-freshness';
 
 import {
 	configuredProviderDefinitions,
@@ -17,6 +16,7 @@ import type {
 	ProviderCostFetcher,
 	ProviderDefinition
 } from './providers/types';
+import { numericValue } from './providers/shared';
 
 type Client = Pick<SupabaseClient<Database>, 'from'>;
 type ProviderConnectionInsert = Database['public']['Tables']['provider_connections']['Insert'];
@@ -47,13 +47,34 @@ export type ProviderBudgetPatch = Pick<
 	'monthly_budget' | 'warning_remaining_amount' | 'critical_remaining_amount'
 >;
 
-export type ProviderConnectionCard = ProviderConnectionViewRow & {
+export type ProviderBudgetStatus =
+	| 'unknown'
+	| 'healthy'
+	| 'warning'
+	| 'critical'
+	| 'over_budget'
+	| 'sync_error';
+
+export type ProviderConnectionCard = {
 	id: string;
 	provider_code: ProviderCode;
 	display_name: string;
-	budget_status: 'unknown' | 'healthy' | 'warning' | 'critical' | 'over_budget' | 'sync_error';
+	status: string | null;
+	credential_source: string | null;
+	credential_name: string | null;
+	currency: string | null;
+	monthly_budget: number | null;
+	warning_remaining_amount: number | null;
+	critical_remaining_amount: number | null;
+	current_period_currency: string | null;
 	current_period_spend: number | null;
 	remaining_budget: number | null;
+	budget_status: ProviderBudgetStatus;
+	latest_fetched_at: string | null;
+	last_sync_status: string | null;
+	last_sync_error: string | null;
+	last_sync_started_at: string | null;
+	last_sync_finished_at: string | null;
 };
 
 type ServerEnvCredentialResolver = (
@@ -66,19 +87,6 @@ type RefreshProviderCostOptions = {
 	fetchMonthToDateCost?: ProviderCostFetcher;
 	resolveCredential?: ServerEnvCredentialResolver;
 };
-
-function parseNumeric(value: unknown): number | null {
-	if (typeof value === 'number') {
-		return Number.isFinite(value) ? value : null;
-	}
-
-	if (typeof value !== 'string' || value.trim() === '') {
-		return null;
-	}
-
-	const parsed = Number(value);
-	return Number.isFinite(parsed) ? parsed : null;
-}
 
 function nullableNumber(value: string): number | null {
 	const trimmed = value.trim();
@@ -95,14 +103,6 @@ function nullableNumber(value: string): number | null {
 export function cacheMinutesFromEnv(value = privateEnv.PROVIDER_COST_CACHE_MINUTES): number {
 	const parsed = Number(value);
 	return Number.isFinite(parsed) && parsed > 0 ? parsed : 60;
-}
-
-export function isSnapshotFresh(
-	latestFetchedAt: string | null,
-	cacheMinutes: number,
-	now = new Date()
-): boolean {
-	return isTimestampFresh(latestFetchedAt, cacheMinutes, now);
 }
 
 export function normalizeBudgetInput(input: {
@@ -128,8 +128,6 @@ export function normalizeBudgetInput(input: {
 export function toProviderConnectionCard(
 	row: ProviderConnectionViewInput
 ): ProviderConnectionCard | null {
-	const spend = parseNumeric(row.current_period_spend);
-	const remaining = parseNumeric(row.remaining_budget);
 	const status = row.budget_status;
 
 	if (
@@ -150,14 +148,29 @@ export function toProviderConnectionCard(
 	}
 
 	return {
-		...row,
 		id: row.id,
 		provider_code: row.provider_code,
 		display_name: row.display_name,
+		status: typeof row.status === 'string' ? row.status : null,
+		credential_source: typeof row.credential_source === 'string' ? row.credential_source : null,
+		credential_name: typeof row.credential_name === 'string' ? row.credential_name : null,
+		currency: typeof row.currency === 'string' ? row.currency : null,
+		monthly_budget: numericValue(row.monthly_budget),
+		warning_remaining_amount: numericValue(row.warning_remaining_amount),
+		critical_remaining_amount: numericValue(row.critical_remaining_amount),
+		current_period_currency:
+			typeof row.current_period_currency === 'string' ? row.current_period_currency : null,
+		current_period_spend: numericValue(row.current_period_spend),
+		remaining_budget: numericValue(row.remaining_budget),
 		budget_status: status,
-		current_period_spend: spend,
-		remaining_budget: remaining
-	} as ProviderConnectionCard;
+		latest_fetched_at: typeof row.latest_fetched_at === 'string' ? row.latest_fetched_at : null,
+		last_sync_status: typeof row.last_sync_status === 'string' ? row.last_sync_status : null,
+		last_sync_error: typeof row.last_sync_error === 'string' ? row.last_sync_error : null,
+		last_sync_started_at:
+			typeof row.last_sync_started_at === 'string' ? row.last_sync_started_at : null,
+		last_sync_finished_at:
+			typeof row.last_sync_finished_at === 'string' ? row.last_sync_finished_at : null
+	};
 }
 
 export function defaultProviderConnection(
@@ -409,9 +422,20 @@ export async function refreshProviderCost(
 		}
 
 		const fetchMonthToDateCost = options.fetchMonthToDateCost ?? definition.fetchMonthToDateCost;
+		const externalProjectIds = connection.external_project_ids ?? [];
+		if (externalProjectIds.length > 0 && definition.externalProjectFilter === null) {
+			throw new ProviderSyncError(
+				'unsupported_filter',
+				`${definition.displayName} cost sync does not support external project filters.`
+			);
+		}
+
 		const result = await fetchMonthToDateCost({
 			adminKey,
-			projectIds: connection.external_project_ids,
+			projectIds:
+				definition.externalProjectFilter === null || externalProjectIds.length === 0
+					? undefined
+					: externalProjectIds,
 			now
 		});
 

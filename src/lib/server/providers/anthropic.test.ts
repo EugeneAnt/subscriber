@@ -112,6 +112,20 @@ describe('Anthropic provider adapter', () => {
 		expect(new URL(calls[1]).searchParams.get('page')).toBe('cursor-2');
 	});
 
+	test('rejects external project filters because the cost endpoint only groups by workspace', async () => {
+		await expect(
+			fetchAnthropicMonthToDateCost({
+				adminKey: 'sk-ant-admin-test',
+				projectIds: ['wrkspc_123'],
+				now: new Date('2026-05-22T13:30:00.000Z'),
+				fetch: async () => jsonResponse({ has_more: false, next_page: null, data: [] })
+			})
+		).rejects.toMatchObject({
+			kind: 'unsupported_filter',
+			message: expect.stringContaining('does not support external project/workspace filters')
+		});
+	});
+
 	test('maps provider HTTP failures to safe errors', async () => {
 		await expect(
 			fetchAnthropicMonthToDateCost({

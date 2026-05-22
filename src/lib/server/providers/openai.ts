@@ -1,8 +1,15 @@
 import { ProviderSyncError } from './errors';
+import {
+	isSupportedCurrency,
+	numericValue,
+	paginationSafetyLimitMessage,
+	redactProviderSecrets,
+	utcMonthWindow as sharedUtcMonthWindow
+} from './shared';
 import type { ProviderCostFetchResult, ProviderCostLine, ProviderDefinition } from './types';
 
 const costsUrl = 'https://api.openai.com/v1/organization/costs';
-const supportedCurrencies = new Set(['USD']);
+const supportedCurrencies = ['USD'] as const;
 const maxPages = 20;
 
 type MonthWindow = {
@@ -34,25 +41,14 @@ type OpenAICostPage = {
 	data?: unknown;
 };
 
-function isoDate(date: Date): string {
-	return date.toISOString().slice(0, 10);
-}
-
-function unixSeconds(date: Date): number {
-	return Math.floor(date.getTime() / 1000);
-}
-
 export function utcMonthWindow(now: Date): MonthWindow {
-	const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-	const tomorrow = new Date(
-		Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)
-	);
+	const window = sharedUtcMonthWindow(now);
 
 	return {
-		periodStart: isoDate(monthStart),
-		periodEndExclusive: isoDate(tomorrow),
-		startTime: unixSeconds(monthStart),
-		endTime: unixSeconds(tomorrow)
+		periodStart: window.periodStart,
+		periodEndExclusive: window.periodEndExclusive,
+		startTime: window.startTime,
+		endTime: window.endTime
 	};
 }
 
@@ -80,10 +76,6 @@ function buildCostsUrl(
 	return url;
 }
 
-function redact(value: string): string {
-	return value.replace(/sk-[A-Za-z0-9_-]+/g, '[redacted]');
-}
-
 async function readPage(response: Response): Promise<OpenAICostPage> {
 	const text = await response.text();
 
@@ -98,7 +90,7 @@ async function readPage(response: Response): Promise<OpenAICostPage> {
 						: 'bad_response';
 		throw new ProviderSyncError(
 			kind,
-			redact(`OpenAI Costs API failed with HTTP ${response.status}: ${text}`),
+			redactProviderSecrets(`OpenAI Costs API failed with HTTP ${response.status}: ${text}`),
 			{
 				status: response.status
 			}
@@ -114,35 +106,17 @@ async function readPage(response: Response): Promise<OpenAICostPage> {
 	}
 }
 
-function amountValue(value: unknown): number | null {
-	if (typeof value === 'number') {
-		return Number.isFinite(value) ? value : null;
-	}
-
-	if (typeof value !== 'string') {
-		return null;
-	}
-
-	const trimmed = value.trim();
-	if (trimmed === '') {
-		return null;
-	}
-
-	const parsed = Number(trimmed);
-	return Number.isFinite(parsed) ? parsed : null;
-}
-
 function amountFromResult(result: OpenAICostResult): { value: number; currency: string } {
 	const value = result.amount?.value;
 	const currency = result.amount?.currency;
-	const parsedValue = amountValue(value);
+	const parsedValue = numericValue(value);
 
 	if (parsedValue === null || typeof currency !== 'string') {
 		throw new ProviderSyncError('bad_response', 'OpenAI Costs API returned a malformed amount.');
 	}
 
 	const normalizedCurrency = currency.toUpperCase();
-	if (!supportedCurrencies.has(normalizedCurrency)) {
+	if (!isSupportedCurrency(normalizedCurrency, supportedCurrencies)) {
 		throw new ProviderSyncError(
 			'unsupported_currency',
 			`OpenAI Costs API returned unsupported currency ${normalizedCurrency}.`
@@ -208,7 +182,8 @@ export async function fetchOpenAIMonthToDateCost(input: {
 				headers: { authorization: `Bearer ${input.adminKey}` }
 			});
 		} catch (error) {
-			const message = error instanceof Error ? redact(error.message) : 'Network request failed.';
+			const message =
+				error instanceof Error ? redactProviderSecrets(error.message) : 'Network request failed.';
 			throw new ProviderSyncError('network', `OpenAI Costs API request failed: ${message}`);
 		}
 
@@ -229,7 +204,7 @@ export async function fetchOpenAIMonthToDateCost(input: {
 		if (pageIndex === maxPages - 1) {
 			throw new ProviderSyncError(
 				'bad_response',
-				'OpenAI Costs API pagination exceeded safety limit.'
+				paginationSafetyLimitMessage('OpenAI Costs API', maxPages)
 			);
 		}
 	}
@@ -263,6 +238,7 @@ export const openaiProvider: ProviderDefinition = {
 	defaultCurrency: 'USD',
 	defaultWarningRemainingAmount: 5,
 	defaultCriticalRemainingAmount: 1,
+	externalProjectFilter: 'project_ids',
 	capabilities: ['costs', 'project_breakdown', 'line_item_breakdown'],
 	fetchMonthToDateCost: fetchOpenAIMonthToDateCost
 };

@@ -2,7 +2,6 @@ import { describe, expect, test } from 'vitest';
 
 import {
 	cacheMinutesFromEnv,
-	isSnapshotFresh,
 	normalizeBudgetInput,
 	toProviderConnectionCard
 } from './provider-costs';
@@ -62,16 +61,6 @@ describe('provider cost helpers', () => {
 		expect(cacheMinutesFromEnv('15')).toBe(15);
 		expect(cacheMinutesFromEnv('0')).toBe(60);
 		expect(cacheMinutesFromEnv('not-number')).toBe(60);
-	});
-
-	test('checks snapshot freshness', () => {
-		expect(
-			isSnapshotFresh('2026-05-22T10:00:00.000Z', 60, new Date('2026-05-22T10:59:59.000Z'))
-		).toBe(true);
-		expect(
-			isSnapshotFresh('2026-05-22T10:00:00.000Z', 60, new Date('2026-05-22T11:00:01.000Z'))
-		).toBe(false);
-		expect(isSnapshotFresh(null, 60, new Date('2026-05-22T11:00:01.000Z'))).toBe(false);
 	});
 
 	test('normalizes budget form inputs', () => {
