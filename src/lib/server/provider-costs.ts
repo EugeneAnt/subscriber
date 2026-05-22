@@ -229,6 +229,23 @@ export async function listProviderConnections(supabase: Client): Promise<Provide
 	});
 }
 
+export async function getProviderConnection(
+	supabase: Client,
+	connectionId: string
+): Promise<ProviderConnectionCard | null> {
+	const { data, error } = await supabase
+		.from('provider_connections_v')
+		.select('*')
+		.eq('id', connectionId)
+		.maybeSingle();
+
+	if (error) {
+		throw error;
+	}
+
+	return data ? toProviderConnectionCard(data) : null;
+}
+
 export async function listLatestProviderCostLines(
 	supabase: Client,
 	connectionIds: string[]

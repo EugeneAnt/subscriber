@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { toast } from 'svelte-sonner';
+
 	import ProviderCostLines from './ProviderCostLines.svelte';
 
 	import type { ProviderConnectionCard } from '$lib/server/provider-costs';
@@ -21,6 +23,26 @@
 	};
 
 	let { connection, lines = [] }: Props = $props();
+	let cardOverride = $state<ProviderConnectionCard | null>(null);
+	let cardLinesOverride = $state<Line[] | null>(null);
+	let card = $derived(cardOverride ?? connection);
+	let cardLines = $derived(cardLinesOverride ?? lines);
+	let refreshPending = $state(false);
+	let budgetPending = $state(false);
+	let localError = $state<string | null>(null);
+
+	type ProviderCostPayload = {
+		connection: ProviderConnectionCard;
+		lines: Line[];
+	};
+
+	$effect(() => {
+		if (cardOverride && cardOverride.id !== connection.id) {
+			cardOverride = null;
+			cardLinesOverride = null;
+			localError = null;
+		}
+	});
 
 	const statusLabels: Record<ProviderConnectionCard['budget_status'], string> = {
 		unknown: 'Unknown',
@@ -74,16 +96,99 @@
 			timeStyle: 'short'
 		}).format(date);
 	}
+
+	async function readProviderCostPayload(response: Response): Promise<ProviderCostPayload> {
+		const body = (await response.json().catch(() => null)) as
+			| (Partial<ProviderCostPayload> & { message?: string })
+			| null;
+
+		if (!response.ok) {
+			throw new Error(body?.message ?? 'Provider cost action failed.');
+		}
+
+		if (!body?.connection || !Array.isArray(body.lines)) {
+			throw new Error('Provider cost response was incomplete.');
+		}
+
+		return {
+			connection: body.connection,
+			lines: body.lines
+		};
+	}
+
+	function applyProviderCostPayload(payload: ProviderCostPayload): void {
+		cardOverride = payload.connection;
+		cardLinesOverride = payload.lines;
+		localError = null;
+	}
+
+	async function submitProviderForm(
+		form: HTMLFormElement,
+		url: string,
+		successMessage: string
+	): Promise<void> {
+		const response = await fetch(url, {
+			method: 'POST',
+			body: new FormData(form),
+			headers: { accept: 'application/json' }
+		});
+
+		applyProviderCostPayload(await readProviderCostPayload(response));
+		toast.success(successMessage);
+	}
+
+	async function refreshProvider(event: SubmitEvent): Promise<void> {
+		event.preventDefault();
+		const form = event.currentTarget;
+		if (!(form instanceof HTMLFormElement)) return;
+
+		refreshPending = true;
+		localError = null;
+
+		try {
+			await submitProviderForm(
+				form,
+				`/provider-costs/${card.id}/refresh`,
+				'Provider costs refreshed.'
+			);
+		} catch (error) {
+			localError = error instanceof Error ? error.message : 'Provider refresh failed.';
+			toast.error(localError);
+		} finally {
+			refreshPending = false;
+		}
+	}
+
+	async function saveBudget(event: SubmitEvent): Promise<void> {
+		event.preventDefault();
+		const form = event.currentTarget;
+		if (!(form instanceof HTMLFormElement)) return;
+
+		budgetPending = true;
+		localError = null;
+
+		try {
+			await submitProviderForm(form, `/provider-costs/${card.id}/budget`, 'Budget saved.');
+		} catch (error) {
+			localError = error instanceof Error ? error.message : 'Budget settings could not be saved.';
+			toast.error(localError);
+		} finally {
+			budgetPending = false;
+		}
+	}
 </script>
 
-<article class="space-y-4 rounded-lg border bg-card p-4 text-card-foreground">
+<article
+	class="space-y-4 rounded-lg border bg-card p-4 text-card-foreground"
+	aria-busy={refreshPending}
+>
 	<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 		<div>
-			<h3 class="text-lg font-semibold">{connection.display_name}</h3>
+			<h3 class="text-lg font-semibold">{card.display_name}</h3>
 			<p class="text-sm text-muted-foreground">Provider-reported current UTC-month spend.</p>
 		</div>
-		<Badge variant={badgeVariant(connection.budget_status)}>
-			{statusLabels[connection.budget_status]}
+		<Badge variant={badgeVariant(card.budget_status)}>
+			{statusLabels[card.budget_status]}
 		</Badge>
 	</div>
 
@@ -91,69 +196,96 @@
 		<div>
 			<p class="text-sm text-muted-foreground">Current month spend</p>
 			<p class="text-xl font-semibold tabular-nums">
-				{formatAmount(connection.current_period_spend, connection.current_period_currency)}
+				{formatAmount(card.current_period_spend, card.current_period_currency)}
 			</p>
 		</div>
 		<div>
 			<p class="text-sm text-muted-foreground">Monthly budget</p>
 			<p class="text-xl font-semibold tabular-nums">
-				{formatAmount(connection.monthly_budget, connection.currency)}
+				{formatAmount(card.monthly_budget, card.currency)}
 			</p>
 		</div>
 		<div>
 			<p class="text-sm text-muted-foreground">Budget remaining</p>
 			<p class="text-xl font-semibold tabular-nums">
-				{formatAmount(connection.remaining_budget, connection.currency)}
+				{formatAmount(card.remaining_budget, card.currency)}
 			</p>
 		</div>
 	</div>
 
-	{#if connection.last_sync_status === 'error' && connection.last_sync_error}
-		<p class="text-sm text-destructive" role="alert">{connection.last_sync_error}</p>
+	{#if localError}
+		<p class="text-sm text-destructive" role="alert">{localError}</p>
+	{:else if card.last_sync_status === 'error' && card.last_sync_error}
+		<p class="text-sm text-destructive" role="alert">{card.last_sync_error}</p>
 	{/if}
 
 	<p class="text-sm text-muted-foreground">
-		Last synced: {formatDateTime(connection.latest_fetched_at)}
+		Last synced: {formatDateTime(card.latest_fetched_at)}
 	</p>
 
-	<form method="POST" action="?/refreshProviderCost">
-		<input type="hidden" name="connection_id" value={connection.id} />
-		<Button type="submit" class="min-h-11">Refresh</Button>
+	<form method="POST" action="?/refreshProviderCost" onsubmit={refreshProvider}>
+		<input type="hidden" name="connection_id" value={card.id} />
+		<Button type="submit" class="min-h-11" disabled={refreshPending}>
+			{#if refreshPending}
+				<span
+					class="me-2 size-4 animate-spin rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground"
+					aria-hidden="true"
+				></span>
+				Refreshing
+			{:else}
+				Refresh
+			{/if}
+		</Button>
 	</form>
 
-	<form method="POST" action="?/updateProviderBudget" class="grid gap-3 sm:grid-cols-4">
-		<input type="hidden" name="connection_id" value={connection.id} />
+	<form
+		method="POST"
+		action="?/updateProviderBudget"
+		class="grid gap-3 sm:grid-cols-4"
+		onsubmit={saveBudget}
+	>
+		<input type="hidden" name="connection_id" value={card.id} />
 		<div class="space-y-2">
-			<Label for={`budget-${connection.id}`}>Monthly budget</Label>
+			<Label for={`budget-${card.id}`}>Monthly budget</Label>
 			<Input
-				id={`budget-${connection.id}`}
+				id={`budget-${card.id}`}
 				name="monthly_budget"
 				inputmode="decimal"
-				value={connection.monthly_budget ?? ''}
+				value={card.monthly_budget ?? ''}
 			/>
 		</div>
 		<div class="space-y-2">
-			<Label for={`warning-${connection.id}`}>Warning left</Label>
+			<Label for={`warning-${card.id}`}>Warning left</Label>
 			<Input
-				id={`warning-${connection.id}`}
+				id={`warning-${card.id}`}
 				name="warning_remaining_amount"
 				inputmode="decimal"
-				value={connection.warning_remaining_amount ?? ''}
+				value={card.warning_remaining_amount ?? ''}
 			/>
 		</div>
 		<div class="space-y-2">
-			<Label for={`critical-${connection.id}`}>Critical left</Label>
+			<Label for={`critical-${card.id}`}>Critical left</Label>
 			<Input
-				id={`critical-${connection.id}`}
+				id={`critical-${card.id}`}
 				name="critical_remaining_amount"
 				inputmode="decimal"
-				value={connection.critical_remaining_amount ?? ''}
+				value={card.critical_remaining_amount ?? ''}
 			/>
 		</div>
 		<div class="flex items-end">
-			<Button type="submit" variant="outline" class="min-h-11 w-full">Save budget</Button>
+			<Button type="submit" variant="outline" class="min-h-11 w-full" disabled={budgetPending}>
+				{#if budgetPending}
+					<span
+						class="me-2 size-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-foreground"
+						aria-hidden="true"
+					></span>
+					Saving
+				{:else}
+					Save budget
+				{/if}
+			</Button>
 		</div>
 	</form>
 
-	<ProviderCostLines {lines} />
+	<ProviderCostLines lines={cardLines} />
 </article>
